@@ -26,6 +26,7 @@ import {
   ArrowRight,
   VideoOff,
 } from 'lucide-react';
+import * as tf from '@tensorflow/tfjs';
 import { cn, formatRupiah } from '@/lib/utils';
 import { api } from '@/lib/api';
 
@@ -77,11 +78,56 @@ export default function KasirPosPage() {
   // Video Ref for HTML5 Camera
   const videoRef = useRef(null);
 
+  // TFJS Model & Mapping States
+  const [modelInfo, setModelInfo] = useState(null);
+  const [modelMapping, setModelMapping] = useState([]);
+  const [tfModel, setTfModel] = useState(null);
+  const [modelError, setModelError] = useState(null);
+
   useEffect(() => {
     setMounted(true);
     fetchProduk();
     fetchPelanggan();
+    fetchActiveModel();
   }, []);
+
+  const fetchActiveModel = async () => {
+    try {
+      const res = await api.get('/ai/active-model');
+      if (res?.berhasil && res.data) {
+        const { model, mappings } = res.data;
+        setModelInfo(model);
+        setModelMapping(mappings);
+
+        // Load the TensorFlow.js Graph Model
+        await tf.ready();
+        const loadedModel = await tf.loadGraphModel(model.model_json_url);
+        setTfModel(loadedModel);
+
+        // Load the class labels list from class.json
+        const classUrl = model.model_json_url.replace('model.json', 'class.json');
+        try {
+          const classRes = await fetch(classUrl);
+          if (classRes.ok) {
+            const labelsData = await classRes.json();
+            let labels = [];
+            if (Array.isArray(labelsData)) {
+              labels = labelsData.map(s => String(s).toLowerCase());
+            } else if (typeof labelsData === 'object') {
+              const keys = Object.keys(labelsData);
+              labels = keys.sort((a, b) => Number(a) - Number(b)).map(k => String(labelsData[k]).toLowerCase());
+            }
+            setClassLabels(labels);
+          }
+        } catch (e) {
+          console.warn('Gagal memuat label kelas dari class.json:', e);
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal memuat model AI aktif:', err.message);
+      setModelError(err.message);
+    }
+  };
 
   const fetchProduk = async () => {
     try {
@@ -217,76 +263,160 @@ export default function KasirPosPage() {
     }
   };
 
+  // TFJS Model Labels & Meta State
+  const [classLabels, setClassLabels] = useState([]);
+  const [lastPredictionsMetadata, setLastPredictionsMetadata] = useState(null);
+
+  const getProductByClassSlug = (slug) => {
+    const mapping = modelMapping.find(m => m.class_slug?.toLowerCase() === slug?.toLowerCase());
+    if (!mapping) return null;
+    return produkList.find(p => p.barcode === mapping.barcode);
+  };
+
   /* ── AI Scan flow ── */
   const handleOpenAiScan = () => {
     setShowAiScan(true);
-    setIsDetecting(true);
     setDetectedProduk(null);
-
-    const snapshot = captureCameraFrame();
-    if (snapshot) lastSnapshotRef.current = snapshot;
-
-    setTimeout(() => {
-      setIsDetecting(false);
-      const high = Math.random() > 0.4;
-      if (high) {
-        const p = produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 };
-        setDetectedProduk({ ...p, confidence: 92 });
-        setTimeout(() => {
-          addToCart(p);
-          setShowAiScan(false);
-          setDetectedProduk(null);
-        }, 1200);
-      } else {
-        setShowAiScan(false);
-        setAiCandidates([
-          { ...(produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 }), match: 92 },
-          { ...(produkList[5] || produkList[1] || { id: 'demo2', nama: 'Produk Demo 2', harga: 15000 }), match: 74 },
-          { ...(produkList[6] || produkList[2] || { id: 'demo3', nama: 'Produk Demo 3', harga: 20000 }), match: 65 },
-        ]);
-        setShowAiCandidates(true);
-      }
-    }, 1800);
+    setIsDetecting(false);
   };
 
-  const handleCaptureSnapshot = () => {
+  const handleCaptureSnapshot = async () => {
+    if (!videoRef.current) return;
     setIsDetecting(true);
     setDetectedProduk(null);
 
     const snapshot = captureCameraFrame();
     if (snapshot) lastSnapshotRef.current = snapshot;
 
-    setTimeout(() => {
-      setIsDetecting(false);
-      const high = Math.random() > 0.4;
-      if (high) {
-        const p = produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 };
-        setDetectedProduk({ ...p, confidence: 92 });
-        setTimeout(() => {
-          addToCart(p);
-          setShowAiScan(false);
-          setDetectedProduk(null);
-        }, 1200);
-      } else {
+    // Fallback if model is not loaded yet
+    if (!tfModel) {
+      setTimeout(() => {
+        setIsDetecting(false);
         setShowAiScan(false);
-        setAiCandidates([
-          { ...(produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 }), match: 92 },
-          { ...(produkList[5] || produkList[1] || { id: 'demo2', nama: 'Produk Demo 2', harga: 15000 }), match: 74 },
-          { ...(produkList[6] || produkList[2] || { id: 'demo3', nama: 'Produk Demo 3', harga: 20000 }), match: 65 },
-        ]);
-        setShowAiCandidates(true);
+        alert('Model AI sedang memuat atau tidak aktif. Silakan gunakan Scan Barcode atau Cari Manual.');
+      }, 1000);
+      return;
+    }
+
+    try {
+      const video = videoRef.current;
+      
+      // 1. Preprocess the video frame
+      const tensor = tf.tidy(() => {
+        const raw = tf.browser.fromPixels(video);
+        const resized = tf.image.resizeBilinear(raw, [224, 224]);
+        return resized.toFloat().expandDims(0);
+      });
+
+      // 2. Run prediction
+      const output = tfModel.predict(tensor);
+      const probs = await output.data();
+      tensor.dispose();
+      output.dispose();
+
+      setIsDetecting(false);
+
+      // 3. Match prediction probabilities to class labels
+      const threshold = Number(modelInfo?.confidence_threshold || 0.65);
+      const predictions = Array.from(probs)
+        .map((score, i) => ({
+          label: classLabels[i] || `Class ${i}`,
+          score: score
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      if (predictions.length === 0) {
+        setShowAiScan(false);
+        alert('Gagal mendeteksi objek. Silakan gunakan Scan Barcode atau Cari Manual.');
+        return;
       }
-    }, 1800);
+
+      const topPrediction = predictions[0];
+
+      // 4. Check if confidence >= threshold and product exists
+      if (topPrediction.score >= threshold) {
+        const matchedProduct = getProductByClassSlug(topPrediction.label);
+        if (matchedProduct) {
+          setDetectedProduk({
+            ...matchedProduct,
+            confidence: Math.round(topPrediction.score * 100)
+          });
+          setTimeout(() => {
+            addToCart(matchedProduct);
+            setShowAiScan(false);
+            setDetectedProduk(null);
+          }, 1200);
+          return;
+        }
+      }
+
+      // 5. Fallback: Map top 3 predictions to POS products for candidates list
+      const candidates = [];
+      const metadata = {
+        pred_1_prod_id: null, pred_1_conf: 0,
+        pred_2_prod_id: null, pred_2_conf: 0,
+        pred_3_prod_id: null, pred_3_conf: 0,
+      };
+
+      for (let i = 0; i < Math.min(3, predictions.length); i++) {
+        const pred = predictions[i];
+        const prod = getProductByClassSlug(pred.label);
+        if (prod) {
+          candidates.push({
+            ...prod,
+            match: Math.round(pred.score * 100)
+          });
+          
+          if (i === 0) {
+            metadata.pred_1_prod_id = prod.id;
+            metadata.pred_1_conf = Number(pred.score.toFixed(4));
+          } else if (i === 1) {
+            metadata.pred_2_prod_id = prod.id;
+            metadata.pred_2_conf = Number(pred.score.toFixed(4));
+          } else if (i === 2) {
+            metadata.pred_3_prod_id = prod.id;
+            metadata.pred_3_conf = Number(pred.score.toFixed(4));
+          }
+        }
+      }
+
+      setLastPredictionsMetadata(metadata);
+
+      if (candidates.length > 0) {
+        setShowAiScan(false);
+        setAiCandidates(candidates);
+        setShowAiCandidates(true);
+      } else {
+        // No matching products found at all
+        setShowAiScan(false);
+        alert('Produk tidak dikenali dalam sistem. Silakan scan barcode atau cari manual.');
+      }
+    } catch (err) {
+      console.error('Inference error:', err);
+      setIsDetecting(false);
+      setShowAiScan(false);
+      alert('Terjadi kesalahan saat memproses gambar.');
+    }
   };
 
   const handleSelectCandidate = (produk) => {
     addToCart(produk);
     setShowAiCandidates(false);
+    
+    // Save to evaluation retraining log
     const snap = lastSnapshotRef.current;
-    api.post('/kasir/ai/koreksi', {
-      produk_dipilih_id: produk.id,
-      foto_url: snap || null,
-    }).catch(() => {});
+    if (snap && lastPredictionsMetadata) {
+      api.post('/ai/koreksi', {
+        foto_base64: snap,
+        prediksi_1_produk_id: lastPredictionsMetadata.pred_1_prod_id,
+        prediksi_1_confidence: lastPredictionsMetadata.pred_1_conf,
+        prediksi_2_produk_id: lastPredictionsMetadata.pred_2_prod_id,
+        prediksi_2_confidence: lastPredictionsMetadata.pred_2_conf,
+        prediksi_3_produk_id: lastPredictionsMetadata.pred_3_prod_id,
+        prediksi_3_confidence: lastPredictionsMetadata.pred_3_conf,
+        produk_dipilih_id: produk.id
+      }).catch((e) => console.warn('Gagal menyimpan evaluasi koreksi:', e));
+    }
   };
 
   /* ── Checkout ── */
@@ -742,12 +872,33 @@ export default function KasirPosPage() {
               ))}
             </div>
 
-            <button
-              onClick={() => setShowAiCandidates(false)}
-              className="w-full mt-4 py-3 bg-gray-100 hover:bg-gray-200 text-sm font-semibold text-gray-600 rounded-2xl transition-colors"
-            >
-              Produk Tidak Ada
-            </button>
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <p className="text-[10px] uppercase font-bold text-gray-400 mb-2.5 text-center tracking-wider">Produk yang dicari tidak ada?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowAiCandidates(false);
+                    setShowBarcodeScan(true);
+                  }}
+                  className="flex-1 py-3 bg-[#16A34A] hover:bg-[#15803D] text-xs font-bold text-white rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <ScanBarcode className="w-4 h-4" />
+                  <span>Scan Barcode</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAiCandidates(false);
+                    // Simply focus the search field on main screen
+                    const searchInput = document.querySelector('input[placeholder*="Cari produk"]');
+                    if (searchInput) searchInput.focus();
+                  }}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <PenLine className="w-4 h-4 text-gray-500" />
+                  <span>Cari Manual</span>
+                </button>
+              </div>
+            </div>
           </div>
         </>
       )}
