@@ -36,10 +36,10 @@ export default function Modal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm animate-fade-in">
       <div
         className={cn(
-          'w-full bg-white rounded-3xl shadow-xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden transition-all transform',
+          'w-full bg-white rounded-3xl shadow-xl border border-gray-100 flex flex-col max-h-[85vh] sm:max-h-[90vh] overflow-hidden transition-all transform',
           isBottomSheet && 'rounded-b-none sm:rounded-3xl self-end sm:self-center',
           sizes[size],
           className
@@ -59,7 +59,7 @@ export default function Modal({
         )}
 
         {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto">{children}</div>
+        <div className="flex-1 p-6 pb-24 sm:pb-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

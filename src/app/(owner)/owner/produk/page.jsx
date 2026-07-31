@@ -289,23 +289,51 @@ export default function OwnerProdukPage() {
     setIsFormOpen(true);
   };
 
+  const getHargaEcer = (p) => {
+    if (!p) return 0;
+    const sj = p.produk_satuan_jual?.[0] || p.satuan_jual?.[0] || {};
+    return Number(
+      p.harga_jual_default ??
+      p.harga_ecer ??
+      sj.harga_ecer ??
+      p.harga_jual ??
+      0
+    );
+  };
+
+  const getHargaGrosir = (p) => {
+    if (!p) return 0;
+    const sj = p.produk_satuan_jual?.[0] || p.satuan_jual?.[0] || {};
+    return Number(
+      p.harga_grosir ??
+      sj.harga_grosir ??
+      0
+    );
+  };
+
   const handleOpenEdit = (p) => {
     setEditingId(p.id);
-    const sj = p.satuan_jual?.[0] || {};
+    const sj = p.produk_satuan_jual?.[0] || p.satuan_jual?.[0] || {};
+    const ecerVal = getHargaEcer(p);
+    const grosirVal = getHargaGrosir(p);
+    const hppVal = Number(p.hpp || 0);
+    const isiGrosir = Number(p.isi_per_grosir || 40);
+    const modalGrosir = p.harga_modal_grosir || (hppVal > 0 ? hppVal * isiGrosir : '');
+
     setFormData({
-      nama: p.nama,
+      nama: p.nama || '',
       barcode: p.barcode || '',
       kategori: p.kategori || 'Makanan',
-      stok: p.stok,
-      stok_minimum: p.stok_minimum,
-      satuan: p.satuan_dasar?.nama || 'pcs',
+      stok: p.stok ?? 0,
+      stok_minimum: p.stok_minimum ?? 10,
+      satuan: p.satuan_dasar?.nama || p.satuan || 'pcs',
       satuan_grosir: p.satuan_grosir || 'Dus',
-      isi_per_grosir: p.isi_per_grosir || 40,
-      harga_modal_grosir: p.harga_modal_grosir || '',
+      isi_per_grosir: isiGrosir,
+      harga_modal_grosir: modalGrosir,
       margin_target: 20,
-      harga_ecer: sj.harga_ecer || '',
-      harga_grosir: sj.harga_grosir || '',
-      min_qty_grosir: sj.min_qty_grosir || 5,
+      harga_ecer: ecerVal > 0 ? ecerVal : '',
+      harga_grosir: grosirVal > 0 ? grosirVal : '',
+      min_qty_grosir: sj.min_qty_grosir || p.min_qty_grosir || 5,
       fotos: p.fotos || (p.img ? [p.img] : []),
     });
     setIsFormOpen(true);
@@ -413,7 +441,9 @@ export default function OwnerProdukPage() {
         <>
           <div className="space-y-2.5">
             {filteredProduk.slice((page - 1) * 20, page * 20).map((p) => {
-              const sj = p.satuan_jual?.[0] || {};
+              const ecerPrice = getHargaEcer(p);
+              const grosirPrice = getHargaGrosir(p);
+              const minQty = p.produk_satuan_jual?.[0]?.min_qty_grosir || p.satuan_jual?.[0]?.min_qty_grosir || 5;
               const isKritis = p.stok <= p.stok_minimum;
 
               return (
@@ -446,11 +476,11 @@ export default function OwnerProdukPage() {
                   {/* Price & Action */}
                   <div className="text-right shrink-0">
                     <p className="text-xs sm:text-sm font-extrabold text-[#16A34A]">
-                      {formatRupiah(sj.harga_ecer || 0)}
+                      {formatRupiah(ecerPrice)}
                     </p>
-                    {sj.harga_grosir && (
+                    {grosirPrice > 0 && (
                       <p className="text-[10px] font-medium text-gray-500 mt-0.5">
-                        Grosir: <span className="font-bold text-gray-700">{formatRupiah(sj.harga_grosir)}</span> (min {sj.min_qty_grosir})
+                        Grosir: <span className="font-bold text-gray-700">{formatRupiah(grosirPrice)}</span> (min {minQty})
                       </p>
                     )}
                     <div className="flex justify-end gap-1.5 mt-2">
