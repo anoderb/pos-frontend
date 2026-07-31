@@ -267,11 +267,132 @@ export default function KasirPosPage() {
   const [classLabels, setClassLabels] = useState([]);
   const [lastPredictionsMetadata, setLastPredictionsMetadata] = useState(null);
 
+  // Real-time AI Continuous Inference Loop Refs
+  const isLoopRunningRef = useRef(false);
+  const isCooldownRef = useRef(false);
+
   const getProductByClassSlug = (slug) => {
     const mapping = modelMapping.find(m => m.class_slug?.toLowerCase() === slug?.toLowerCase());
     if (!mapping) return null;
     return produkList.find(p => p.barcode === mapping.barcode);
   };
+
+  // 🔄 REAL-TIME AI CONTINUOUS INFERENCE LOOP (Every 350ms)
+  useEffect(() => {
+    let aiLoopTimer = null;
+
+    if (showAiScan && cameraActive && tfModel) {
+      isCooldownRef.current = false;
+      isLoopRunningRef.current = false;
+
+      aiLoopTimer = setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
+        if (isLoopRunningRef.current || isCooldownRef.current) return;
+
+        try {
+          isLoopRunningRef.current = true;
+
+          // Capture current frame snapshot synchronously for retraining/evaluation payload
+          const snapshot = captureCameraFrame();
+          if (snapshot) lastSnapshotRef.current = snapshot;
+
+          // 1. Preprocess the video frame with tf.tidy for memory safety
+          const video = videoRef.current;
+          const tensor = tf.tidy(() => {
+            const raw = tf.browser.fromPixels(video);
+            const resized = tf.image.resizeBilinear(raw, [224, 224]);
+            return resized.toFloat().expandDims(0);
+          });
+
+          // 2. Run prediction
+          const output = tfModel.predict(tensor);
+          const probs = await output.data();
+          tensor.dispose();
+          output.dispose();
+
+          const threshold = Number(modelInfo?.confidence_threshold || 0.65);
+          const predictions = Array.from(probs)
+            .map((score, i) => ({
+              label: classLabels[i] || `Class ${i}`,
+              score: score
+            }))
+            .sort((a, b) => b.score - a.score);
+
+          if (predictions.length > 0) {
+            const topPrediction = predictions[0];
+
+            // Case A: High Confidence Match (>= Threshold) -> Auto Add & 1.5s Cooldown
+            if (topPrediction.score >= threshold) {
+              const matchedProduct = getProductByClassSlug(topPrediction.label);
+              if (matchedProduct) {
+                isCooldownRef.current = true;
+                setDetectedProduk({
+                  ...matchedProduct,
+                  confidence: Math.round(topPrediction.score * 100)
+                });
+
+                addToCart(matchedProduct);
+
+                // Cooldown for 1.5 seconds then resume scanning without closing camera
+                setTimeout(() => {
+                  setDetectedProduk(null);
+                  isCooldownRef.current = false;
+                }, 1500);
+              }
+            }
+            // Case B: Ambiguous / Low Confidence (0.25 <= score < Threshold) -> Auto Pause & Open Candidates Sheet with Cached Snapshot
+            else if (topPrediction.score >= 0.25) {
+              isCooldownRef.current = true; // Pause scanning loop
+
+              const candidates = [];
+              const metadata = {
+                pred_1_prod_id: null, pred_1_conf: 0,
+                pred_2_prod_id: null, pred_2_conf: 0,
+                pred_3_prod_id: null, pred_3_conf: 0,
+              };
+
+              for (let i = 0; i < Math.min(3, predictions.length); i++) {
+                const pred = predictions[i];
+                const prod = getProductByClassSlug(pred.label);
+                if (prod) {
+                  candidates.push({
+                    ...prod,
+                    match: Math.round(pred.score * 100)
+                  });
+
+                  if (i === 0) {
+                    metadata.pred_1_prod_id = prod.id;
+                    metadata.pred_1_conf = Number(pred.score.toFixed(4));
+                  } else if (i === 1) {
+                    metadata.pred_2_prod_id = prod.id;
+                    metadata.pred_2_conf = Number(pred.score.toFixed(4));
+                  } else if (i === 2) {
+                    metadata.pred_3_prod_id = prod.id;
+                    metadata.pred_3_conf = Number(pred.score.toFixed(4));
+                  }
+                }
+              }
+
+              if (candidates.length > 0) {
+                setLastPredictionsMetadata(metadata);
+                setAiCandidates(candidates);
+                setShowAiScan(false);
+                setShowAiCandidates(true);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Real-time AI loop error:', err);
+        } finally {
+          isLoopRunningRef.current = false;
+        }
+      }, 350);
+    }
+
+    return () => {
+      if (aiLoopTimer) clearInterval(aiLoopTimer);
+    };
+  }, [showAiScan, cameraActive, tfModel, classLabels, modelMapping, produkList]);
 
   /* ── AI Scan flow ── */
   const handleOpenAiScan = () => {
@@ -730,13 +851,13 @@ export default function KasirPosPage() {
           <div className="relative z-20 flex-1 flex flex-col items-center justify-center p-4">
             {/* Floating Detection Status Pill */}
             <div className="mb-4 px-4 py-1.5 bg-black/60 backdrop-blur border border-white/10 rounded-full text-white text-xs font-semibold flex items-center gap-2 shadow-md">
-              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : isDetecting ? 'bg-amber-400' : 'bg-emerald-400')} />
+              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : 'bg-emerald-400')} />
               <span>
                 {showBarcodeScan
                   ? 'Mendeteksi barcode...'
-                  : isDetecting
-                  ? 'Memproses Gambar AI...'
-                  : 'Arahkan produk & Tekan Tombol Kamera (Shutter)'}
+                  : detectedProduk
+                  ? `Sukses! ${detectedProduk.nama} Terdeteksi`
+                  : 'Memindai AI Real-Time (Otomatis)...'}
               </span>
             </div>
 
