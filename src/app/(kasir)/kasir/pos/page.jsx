@@ -99,12 +99,26 @@ export default function KasirPosPage() {
         setModelInfo(model);
         setModelMapping(mappings);
 
-        // Load the TensorFlow.js Graph Model
         await tf.ready();
-        const loadedModel = await tf.loadGraphModel(model.model_json_url);
+
+        // 1. Try loading from local IndexedDB cache for instant speed
+        const cacheKey = `indexeddb://tokiva-model-${model.id || model.versi || 'v1'}`;
+        let loadedModel = null;
+        try {
+          loadedModel = await tf.loadGraphModel(cacheKey);
+        } catch (cacheErr) {
+          // 2. Fallback: Download from network and cache into IndexedDB
+          loadedModel = await tf.loadGraphModel(model.model_json_url);
+          try {
+            await loadedModel.save(cacheKey);
+          } catch (saveErr) {
+            console.warn('Gagal menyimpan cache model:', saveErr);
+          }
+        }
+
         setTfModel(loadedModel);
 
-        // Load the class labels list from class.json
+        // Load class labels list from class.json
         const classUrl = model.model_json_url.replace('model.json', 'class.json');
         try {
           const classRes = await fetch(classUrl);
@@ -546,6 +560,8 @@ export default function KasirPosPage() {
 
     try {
       const payload = {
+        subtotal: subtotal,
+        total: total,
         pelanggan_id: selectedCustomer?.id !== 'umum' ? selectedCustomer?.id : null,
         metode_bayar: metodeBayar === 'tunai' ? 'cash' : metodeBayar,
         nominal_bayar: metodeBayar === 'tunai' ? uangNum : total,
@@ -851,10 +867,12 @@ export default function KasirPosPage() {
           <div className="relative z-20 flex-1 flex flex-col items-center justify-center p-4">
             {/* Floating Detection Status Pill */}
             <div className="mb-4 px-4 py-1.5 bg-black/60 backdrop-blur border border-white/10 rounded-full text-white text-xs font-semibold flex items-center gap-2 shadow-md">
-              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : 'bg-emerald-400')} />
+              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : !tfModel ? 'bg-amber-400' : 'bg-emerald-400')} />
               <span>
                 {showBarcodeScan
                   ? 'Mendeteksi barcode...'
+                  : !tfModel
+                  ? 'Memuat Model AI ke Browser...'
                   : detectedProduk
                   ? `Sukses! ${detectedProduk.nama} Terdeteksi`
                   : 'Memindai AI Real-Time (Otomatis)...'}
@@ -874,8 +892,17 @@ export default function KasirPosPage() {
                 <div className="absolute left-4 right-4 h-0.5 bg-red-500 shadow-lg shadow-red-500/80 animate-pulse top-1/2 -translate-y-1/2" />
               )}
 
-              {/* AI Spinner */}
-              {showAiScan && isDetecting && (
+              {/* AI Model Loading State */}
+              {showAiScan && !tfModel && (
+                <div className="bg-black/70 backdrop-blur px-5 py-4 rounded-2xl border border-white/10 text-center animate-fade-in">
+                  <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-xs text-emerald-300 font-bold">Memuat Model AI...</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Menyiapkan cache IndexedDB browser</p>
+                </div>
+              )}
+
+              {/* AI Manual Processing Spinner */}
+              {showAiScan && tfModel && isDetecting && (
                 <div className="bg-black/60 backdrop-blur px-5 py-3.5 rounded-2xl border border-white/10 text-center">
                   <div className="w-10 h-10 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                   <p className="text-xs text-emerald-300 font-bold">Pemindaian AI...</p>
