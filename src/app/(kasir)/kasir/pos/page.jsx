@@ -730,8 +730,14 @@ export default function KasirPosPage() {
           <div className="relative z-20 flex-1 flex flex-col items-center justify-center p-4">
             {/* Floating Detection Status Pill */}
             <div className="mb-4 px-4 py-1.5 bg-black/60 backdrop-blur border border-white/10 rounded-full text-white text-xs font-semibold flex items-center gap-2 shadow-md">
-              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : 'bg-emerald-400')} />
-              <span>{showBarcodeScan ? 'Mendeteksi barcode...' : 'Mendeteksi produk...'}</span>
+              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : isDetecting ? 'bg-amber-400' : 'bg-emerald-400')} />
+              <span>
+                {showBarcodeScan
+                  ? 'Mendeteksi barcode...'
+                  : isDetecting
+                  ? 'Memproses Gambar AI...'
+                  : 'Arahkan produk & Tekan Tombol Kamera (Shutter)'}
+              </span>
             </div>
 
             {/* Bounding Box Frame */}
@@ -813,13 +819,22 @@ export default function KasirPosPage() {
               </button>
 
               {/* Center Shutter Button */}
-              <button
-                onClick={handleCaptureSnapshot}
-                className="w-14 h-14 bg-gradient-to-tr from-[#16A34A] to-emerald-400 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30 hover:scale-105 active:scale-95 transition-all -mt-5 border-4 border-black"
-                title="Ambil Foto & Scan AI"
-              >
-                <Camera className="w-7 h-7 text-white" />
-              </button>
+              <div className="relative -mt-5">
+                {showAiScan && !isDetecting && (
+                  <span className="absolute -inset-1 rounded-full bg-emerald-400/50 animate-ping pointer-events-none" />
+                )}
+                <button
+                  onClick={handleCaptureSnapshot}
+                  disabled={isDetecting}
+                  className={cn(
+                    'relative z-10 w-14 h-14 bg-gradient-to-tr from-[#16A34A] to-emerald-400 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-105 active:scale-95 transition-all border-4 border-black',
+                    isDetecting && 'opacity-70 cursor-not-allowed'
+                  )}
+                  title="Ambil Foto & Scan AI"
+                >
+                  <Camera className="w-7 h-7 text-white" />
+                </button>
+              </div>
 
               {/* Manual Button */}
               <button
