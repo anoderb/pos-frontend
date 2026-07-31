@@ -230,7 +230,7 @@ export default function KasirPosPage() {
       setIsDetecting(false);
       const high = Math.random() > 0.4;
       if (high) {
-        const p = produkList[0];
+        const p = produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 };
         setDetectedProduk({ ...p, confidence: 92 });
         setTimeout(() => {
           addToCart(p);
@@ -240,9 +240,39 @@ export default function KasirPosPage() {
       } else {
         setShowAiScan(false);
         setAiCandidates([
-          { ...produkList[0], match: 92 },
-          { ...(produkList[5] || produkList[1]), match: 74 },
-          { ...(produkList[6] || produkList[2]), match: 65 },
+          { ...(produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 }), match: 92 },
+          { ...(produkList[5] || produkList[1] || { id: 'demo2', nama: 'Produk Demo 2', harga: 15000 }), match: 74 },
+          { ...(produkList[6] || produkList[2] || { id: 'demo3', nama: 'Produk Demo 3', harga: 20000 }), match: 65 },
+        ]);
+        setShowAiCandidates(true);
+      }
+    }, 1800);
+  };
+
+  const handleCaptureSnapshot = () => {
+    setIsDetecting(true);
+    setDetectedProduk(null);
+
+    const snapshot = captureCameraFrame();
+    if (snapshot) lastSnapshotRef.current = snapshot;
+
+    setTimeout(() => {
+      setIsDetecting(false);
+      const high = Math.random() > 0.4;
+      if (high) {
+        const p = produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 };
+        setDetectedProduk({ ...p, confidence: 92 });
+        setTimeout(() => {
+          addToCart(p);
+          setShowAiScan(false);
+          setDetectedProduk(null);
+        }, 1200);
+      } else {
+        setShowAiScan(false);
+        setAiCandidates([
+          { ...(produkList[0] || { id: 'demo', nama: 'Produk Demo', harga: 10000 }), match: 92 },
+          { ...(produkList[5] || produkList[1] || { id: 'demo2', nama: 'Produk Demo 2', harga: 15000 }), match: 74 },
+          { ...(produkList[6] || produkList[2] || { id: 'demo3', nama: 'Produk Demo 3', harga: 20000 }), match: 65 },
         ]);
         setShowAiCandidates(true);
       }
