@@ -70,6 +70,7 @@ export default function OwnerProdukPage() {
   const [produkList, setProdukList] = useState([]);
   const [search, setSearch] = useState('');
   const [filterStok, setFilterStok] = useState('semua');
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
   const [satuanOptions, setSatuanOptions] = useState(SATUAN_ECERAN_OPTIONS);
@@ -83,6 +84,10 @@ export default function OwnerProdukPage() {
       }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterStok]);
 
   const fetchProduk = async () => {
     try {
@@ -327,10 +332,10 @@ export default function OwnerProdukPage() {
       };
 
       if (editingId) {
-        await api.put(`/produk/${editingId}`, payload);
+        await api.put(`/owner/produk/${editingId}`, payload);
         setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Data produk berhasil diperbarui.' });
       } else {
-        await api.post('/produk', payload);
+        await api.post('/owner/produk', payload);
         setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Produk baru berhasil ditambahkan.' });
       }
       setIsFormOpen(false);
@@ -343,7 +348,7 @@ export default function OwnerProdukPage() {
   const executeDelete = async () => {
     if (!confirmDelete.id) return;
     try {
-      await api.delete(`/produk/${confirmDelete.id}`);
+      await api.delete(`/owner/produk/${confirmDelete.id}`);
       setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Produk telah dinonaktifkan.' });
       setConfirmDelete({ isOpen: false, id: null, nama: '' });
       fetchProduk();

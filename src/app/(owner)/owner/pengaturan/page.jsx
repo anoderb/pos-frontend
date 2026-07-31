@@ -83,7 +83,7 @@ export default function OwnerPengaturanPage() {
 
     try {
       setIsSubmitting(true);
-      await api.post('/owner/pengguna/kasir', kasirForm);
+      await api.post('/owner/pengguna', kasirForm);
       setFeedback({
         isOpen: true,
         type: 'success',
