@@ -97,13 +97,30 @@ export default function AdminKurasiPage() {
                 className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-5"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shrink-0">
-                    <img src={item.foto_url} alt="Koreksi" className="w-full h-full object-cover" />
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shrink-0 flex items-center justify-center relative">
+                    {item.foto_url ? (
+                      <img
+                        src={item.foto_url}
+                        alt="Foto Koreksi"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+                        }}
+                      />
+                    ) : (
+                      <div className="text-[10px] text-slate-500 font-mono text-center p-1">No Image</div>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
-                        AI: {item.deteksi_ai?.prediksi || 'Unknown'} ({(item.deteksi_ai?.confidence * 100).toFixed(0)}%)
+                        AI: {item.prediksi_1?.nama || item.deteksi_ai?.prediksi || 'Unknown'}{' '}
+                        ({item.prediksi_1_confidence != null && !isNaN(Number(item.prediksi_1_confidence))
+                          ? `${Math.round(Number(item.prediksi_1_confidence) <= 1 ? Number(item.prediksi_1_confidence) * 100 : Number(item.prediksi_1_confidence))}%`
+                          : item.deteksi_ai?.confidence != null && !isNaN(Number(item.deteksi_ai?.confidence))
+                          ? `${Math.round(Number(item.deteksi_ai?.confidence) * 100)}%`
+                          : '—%'})
                       </span>
                       <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
                       <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">

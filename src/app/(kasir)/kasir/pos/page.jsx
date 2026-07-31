@@ -243,20 +243,52 @@ export default function KasirPosPage() {
     }
   };
 
-  /* ── Cart helpers ── */
-  const addToCart = (produk) => {
-    const idx = cart.findIndex(i => i.id === produk.id);
-    if (idx > -1) {
-      const c = [...cart];
-      c[idx].qty += 1;
-      setCart(c);
-    } else {
-      setCart([...cart, { ...produk, qty: 1 }]);
+  // 🔊 Helper for POS Scanner Beep Sound (Web Audio API)
+  const playBeepSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1800, ctx.currentTime); // 1800Hz POS Scanner Beep Pitch
+
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.085);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.085);
+    } catch {
+      // Audio autoplay policy fallback
     }
   };
 
+  /* ── Cart helpers ── */
+  const addToCart = (produk) => {
+    playBeepSound();
+    if (!produk || !produk.id) return;
+    setCart((prevCart) => {
+      const idx = prevCart.findIndex(i => i.id === produk.id);
+      if (idx > -1) {
+        const nextCart = [...prevCart];
+        nextCart[idx] = { ...nextCart[idx], qty: nextCart[idx].qty + 1 };
+        return nextCart;
+      }
+      return [...prevCart, { ...produk, qty: 1 }];
+    });
+  };
+
   const updateQty = (id, delta) => {
-    setCart(prev => prev.map(i => i.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i).filter(i => i.qty > 0));
+    setCart((prevCart) =>
+      prevCart
+        .map(i => (i.id === id ? { ...i, qty: Math.max(0, i.qty + delta) } : i))
+        .filter(i => i.qty > 0)
+    );
   };
 
   const clearCart = () => setCart([]);
@@ -342,7 +374,7 @@ export default function KasirPosPage() {
           if (predictions.length > 0) {
             const topPrediction = predictions[0];
 
-            // Case A: High Confidence Match (>= Threshold) -> Auto Add & 1.5s Cooldown
+            // Case A: High Confidence Match (>= Threshold) -> Auto Add & 1.2s Cooldown
             if (topPrediction.score >= threshold) {
               const matchedProduct = getProductByClassSlug(topPrediction.label);
               if (matchedProduct) {
@@ -351,19 +383,20 @@ export default function KasirPosPage() {
                   ...matchedProduct,
                   confidence: Math.round(topPrediction.score * 100)
                 });
+                setAiCandidates([]); // Clear any previous candidates banner
 
                 addToCart(matchedProduct);
 
-                // Cooldown for 1.5 seconds then resume scanning without closing camera
+                // Auto-resume scanning for the next item after 1.2 seconds (hands-free)
                 setTimeout(() => {
                   setDetectedProduk(null);
                   isCooldownRef.current = false;
-                }, 1500);
+                }, 1200);
               }
             }
-            // Case B: Ambiguous / Low Confidence (0.25 <= score < Threshold) -> Auto Pause & Open Candidates Sheet with Cached Snapshot
+            // Case B: Ambiguous / Low Confidence (0.25 <= score < Threshold) -> Auto Pause & Show Candidates Banner with Auto-Resume
             else if (topPrediction.score >= 0.25) {
-              isCooldownRef.current = true; // Pause scanning loop
+              isCooldownRef.current = true; // Pause scanning loop briefly
 
               const candidates = [];
               const metadata = {
@@ -397,8 +430,13 @@ export default function KasirPosPage() {
               if (candidates.length > 0) {
                 setLastPredictionsMetadata(metadata);
                 setAiCandidates(candidates);
-                setShowAiScan(false);
-                setShowAiCandidates(true);
+
+                // Auto-resume scanning after 1.5s if cashier brings a new product or moves item
+                setTimeout(() => {
+                  isCooldownRef.current = false;
+                }, 1500);
+              } else {
+                isCooldownRef.current = false;
               }
             }
           }
@@ -427,8 +465,10 @@ export default function KasirPosPage() {
 
   const handleCaptureSnapshot = async () => {
     if (!videoRef.current) return;
-    setIsDetecting(true);
+    isCooldownRef.current = false;
+    setAiCandidates([]);
     setDetectedProduk(null);
+    setIsDetecting(true);
 
     const snapshot = captureCameraFrame();
     if (snapshot) lastSnapshotRef.current = snapshot;
@@ -437,9 +477,8 @@ export default function KasirPosPage() {
     if (!tfModel) {
       setTimeout(() => {
         setIsDetecting(false);
-        setShowAiScan(false);
         alert('Model AI sedang memuat atau tidak aktif. Silakan gunakan Scan Barcode atau Cari Manual.');
-      }, 1000);
+      }, 500);
       return;
     }
 
@@ -471,7 +510,6 @@ export default function KasirPosPage() {
         .sort((a, b) => b.score - a.score);
 
       if (predictions.length === 0) {
-        setShowAiScan(false);
         alert('Gagal mendeteksi objek. Silakan gunakan Scan Barcode atau Cari Manual.');
         return;
       }
@@ -482,15 +520,16 @@ export default function KasirPosPage() {
       if (topPrediction.score >= threshold) {
         const matchedProduct = getProductByClassSlug(topPrediction.label);
         if (matchedProduct) {
+          isCooldownRef.current = true;
           setDetectedProduk({
             ...matchedProduct,
             confidence: Math.round(topPrediction.score * 100)
           });
+          addToCart(matchedProduct);
           setTimeout(() => {
-            addToCart(matchedProduct);
-            setShowAiScan(false);
             setDetectedProduk(null);
-          }, 1200);
+            isCooldownRef.current = false;
+          }, 1500);
           return;
         }
       }
@@ -528,27 +567,24 @@ export default function KasirPosPage() {
       setLastPredictionsMetadata(metadata);
 
       if (candidates.length > 0) {
-        setShowAiScan(false);
         setAiCandidates(candidates);
-        setShowAiCandidates(true);
+        isCooldownRef.current = true; // Lock scan so prediction candidates stay fixed without flickering!
       } else {
-        // No matching products found at all
-        setShowAiScan(false);
         alert('Produk tidak dikenali dalam sistem. Silakan scan barcode atau cari manual.');
       }
     } catch (err) {
       console.error('Inference error:', err);
       setIsDetecting(false);
-      setShowAiScan(false);
       alert('Terjadi kesalahan saat memproses gambar.');
     }
   };
 
   const handleSelectCandidate = (produk) => {
     addToCart(produk);
-    setShowAiCandidates(false);
+    setAiCandidates([]);
+    isCooldownRef.current = false;
     
-    // Save to evaluation retraining log
+    // Save base64 snapshot to evaluation retraining log
     const snap = lastSnapshotRef.current;
     if (snap && lastPredictionsMetadata) {
       api.post('/ai/koreksi', {
@@ -777,36 +813,82 @@ export default function KasirPosPage() {
         </div>
       </div>
 
-      {/* ── Mini Cart Preview ── */}
+      {/* ── Mini Cart Preview with Bottom Subtotal & Kosongkan Footer Bar ── */}
       {cart.length > 0 && (
-        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm">
-          <button
-            onClick={() => setView('cart')}
-            className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-50"
-          >
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          {/* Header Row */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 bg-gray-50/50">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-[#16A34A]" />
-              <span className="text-sm font-bold text-gray-900">Keranjang ({cartCount})</span>
+              <span className="text-sm font-extrabold text-gray-900">Keranjang ({cartCount})</span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-gray-400">
-              <span>Subtotal</span>
-              <span className="font-bold text-gray-900 ml-1">{formatRupiah(subtotal)}</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </button>
-          <div className="px-4 py-2 space-y-2 max-h-36 overflow-y-auto">
+          </div>
+
+          {/* Item List with Steppers (+/-) and Delete Button */}
+          <div className="px-4 py-2 space-y-2.5 max-h-48 overflow-y-auto">
             {cart.map((item, idx) => (
-              <div key={item.id || `mini-cart-${idx}`} className="flex items-center justify-between text-xs py-1.5">
-                <div className="flex items-center gap-2 min-w-0">
+              <div key={item.id || `mini-cart-${idx}`} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
                   <ProdukThumb nama={item.nama} className="w-8 h-8 rounded-lg shrink-0 text-[9px]" />
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{item.nama}</p>
-                    <p className="text-gray-400">{item.qty} x {formatRupiah(item.harga)}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-xs text-gray-900 truncate" title={item.nama}>{item.nama}</p>
+                    <p className="text-gray-400 text-[11px]">{item.qty} x {formatRupiah(item.harga)}</p>
                   </div>
                 </div>
-                <span className="font-bold text-gray-900 shrink-0 ml-2">{formatRupiah(item.harga * item.qty)}</span>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-bold text-xs text-gray-900">{formatRupiah(item.harga * item.qty)}</span>
+
+                  {/* Quantity Stepper Controls: Minus (-), Qty Count, Plus (+) */}
+                  <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-1 py-0.5">
+                    <button
+                      onClick={() => updateQty(item.id, -1)}
+                      className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-rose-600 rounded hover:bg-white transition-colors"
+                      title="Kurangi Qty"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="font-bold text-xs text-gray-900 px-0.5 min-w-[14px] text-center">{item.qty}</span>
+                    <button
+                      onClick={() => updateQty(item.id, 1)}
+                      className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-[#16A34A] rounded hover:bg-white transition-colors"
+                      title="Tambah Qty"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Delete Item Button */}
+                  <button
+                    onClick={() => updateQty(item.id, -item.qty)}
+                    className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
+                    title="Hapus barang"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
+          </div>
+
+          {/* Bottom Footer Bar: Kosongkan (Left) & Subtotal (Right) */}
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50/80 border-t border-gray-100">
+            <button
+              onClick={clearCart}
+              className="text-xs text-rose-500 hover:text-rose-600 font-semibold flex items-center gap-1.5 transition-colors px-2.5 py-1 rounded-xl bg-rose-50/80 hover:bg-rose-100/80 border border-rose-200/50 active:scale-95"
+              title="Kosongkan seluruh isi keranjang"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Kosongkan</span>
+            </button>
+            <button
+              onClick={() => setView('cart')}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 font-medium transition-colors"
+            >
+              <span>Subtotal</span>
+              <span className="font-extrabold text-gray-900 text-sm ml-0.5">{formatRupiah(subtotal)}</span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </button>
           </div>
         </div>
       )}
@@ -844,7 +926,7 @@ export default function KasirPosPage() {
               <button
                 onClick={() => { setShowBarcodeScan(false); setShowAiScan(true); handleOpenAiScan(); }}
                 className={cn(
-                  'px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
+                  'px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
                   showAiScan
                     ? 'bg-[#16A34A] text-white font-bold shadow-sm'
                     : 'text-gray-300 hover:text-white'
@@ -856,7 +938,7 @@ export default function KasirPosPage() {
               <button
                 onClick={() => { setShowAiScan(false); setShowBarcodeScan(true); }}
                 className={cn(
-                  'px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
+                  'px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
                   showBarcodeScan
                     ? 'bg-[#16A34A] text-white font-bold shadow-sm'
                     : 'text-gray-300 hover:text-white'
@@ -864,6 +946,14 @@ export default function KasirPosPage() {
               >
                 <ScanBarcode className="w-3.5 h-3.5" />
                 Barcode Mode
+              </button>
+              <button
+                onClick={() => { setShowAiScan(false); setShowBarcodeScan(false); setView('home'); setAiCandidates([]); }}
+                className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-all flex items-center gap-1.5"
+                title="Beralih ke Input Manual POS"
+              >
+                <PenLine className="w-3.5 h-3.5" />
+                Manual
               </button>
             </div>
 
@@ -950,19 +1040,27 @@ export default function KasirPosPage() {
               )}
             </div>
 
-            {/* Scanned Barcode Result Pill */}
-            {showBarcodeScan && scannedBarcodeCode && (
-              <div className="mt-4 bg-emerald-500 text-white rounded-2xl px-5 py-2.5 text-center shadow-xl animate-slide-up">
-                <p className="text-[9px] uppercase font-bold tracking-wider opacity-90">Barcode Terdeteksi</p>
-                <p className="text-base font-mono font-extrabold">{scannedBarcodeCode}</p>
+            {/* Detected Result Status Pill directly under bounding box */}
+            {showAiScan && detectedProduk && !isDetecting && (
+              <div className="mt-3 px-4 py-2 bg-black/75 backdrop-blur border border-emerald-500/30 rounded-2xl text-white text-xs font-semibold flex items-center gap-2 shadow-lg animate-fade-in">
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Produk terdeteksi! <span className="text-emerald-400 font-bold">Confidence {detectedProduk.confidence}%</span></span>
               </div>
             )}
 
-            {/* Demo Barcode Simulation Buttons */}
+            {/* Scanned Barcode Result Pill */}
+            {showBarcodeScan && scannedBarcodeCode && (
+              <div className="mt-3 px-4 py-2 bg-black/75 backdrop-blur border border-emerald-500/30 rounded-2xl text-white text-xs font-semibold flex items-center gap-2 shadow-lg animate-fade-in">
+                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Barcode: <span className="font-mono text-emerald-400 font-bold">{scannedBarcodeCode}</span></span>
+              </div>
+            )}
+
+            {/* Demo Barcode Simulation Buttons (Barcode Mode Only) */}
             {showBarcodeScan && (
-              <div className="mt-4 flex items-center justify-center gap-1.5 flex-wrap max-w-xs">
+              <div className="mt-3 flex items-center justify-center gap-1.5 flex-wrap max-w-xs">
                 <span className="text-[10px] text-gray-400 font-medium">Test Barcode:</span>
-                {produkList.slice(0, 3).map((p, idx) => (
+                {produkList.slice(0, 2).map((p, idx) => (
                   <button
                     key={p.id || `test-code-${idx}`}
                     onClick={() => handleDetectedBarcode(p.barcode)}
@@ -975,65 +1073,105 @@ export default function KasirPosPage() {
             )}
           </div>
 
-          {/* 4. Detected Product Result Card (Floating Bottom Card matching Mockup Image 2) */}
-          {showAiScan && detectedProduk && !isDetecting && (
-            <div className="relative z-30 mx-4 mb-3 bg-white rounded-2xl p-4 shadow-2xl animate-slide-up max-w-sm mx-auto">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <ProdukThumb nama={detectedProduk.nama} className="w-12 h-12 rounded-xl text-sm shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-900">{detectedProduk.nama}</h4>
-                    <p className="text-xs font-semibold text-[#16A34A] mt-0.5">{detectedProduk.confidence}% • Confidence Tinggi</p>
-                  </div>
+          {/* 4. Top 3 Predictions Candidate Banner (KHUSUS AI MODE ONLY) */}
+          {showAiScan && aiCandidates.length > 0 && (
+            <div className="relative z-30 mx-4 mb-2 bg-black/80 backdrop-blur border border-white/15 rounded-2xl p-2.5 shadow-2xl animate-slide-up max-w-md mx-auto">
+              <div className="flex items-center justify-between px-1 mb-1.5 text-[11px]">
+                <div className="flex items-center gap-1.5 text-rose-400 font-semibold truncate">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0" />
+                  <span className="truncate">Confidence rendah ({aiCandidates[0]?.match || 62}%). Pilih produk yang sesuai.</span>
                 </div>
-                <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                  <CheckCircle className="w-5 h-5 text-[#16A34A]" />
-                </div>
+                <button onClick={() => setAiCandidates([])} className="text-gray-400 hover:text-white shrink-0 text-[10px] font-medium flex items-center gap-1 ml-2">
+                  Top 3 prediksi <ChevronRight className="w-3 h-3" />
+                </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2 text-center pt-2 border-t border-gray-100">Menambahkan ke keranjang...</p>
+              <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white">
+                {aiCandidates.slice(0, 3).map((cand, idx) => (
+                  <React.Fragment key={cand.id || idx}>
+                    {idx > 0 && <span className="text-gray-600 font-light mx-1">|</span>}
+                    <button
+                      onClick={() => handleSelectCandidate(cand)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-1 py-1 hover:bg-white/10 rounded-lg transition-colors min-w-0"
+                    >
+                      <span className="font-bold text-gray-400 text-[11px]">{idx + 1}</span>
+                      <span className="font-semibold text-[11px] truncate">{cand.nama}</span>
+                      <span className="font-bold text-[#16A34A] text-[10px] shrink-0">{cand.match}%</span>
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* 5. Bottom Control Bar (Floating Dark Capsule Bar matching Mockup Image 2) */}
-          <div className="relative z-20 pb-8 pt-2 px-4 flex justify-center">
-            <div className="bg-black/60 backdrop-blur border border-white/15 px-6 py-3 rounded-full flex items-center justify-around gap-8 shadow-2xl max-w-xs w-full">
-              {/* Barcode Button */}
-              <button
-                onClick={() => { setShowAiScan(false); setShowBarcodeScan(true); }}
-                className={cn('flex flex-col items-center gap-1 transition-all', showBarcodeScan ? 'text-[#16A34A]' : 'text-gray-300 hover:text-white')}
-              >
-                <ScanBarcode className="w-5 h-5" />
-                <span className="text-[10px] font-semibold">Barcode</span>
-              </button>
-
-              {/* Center Shutter Button */}
-              <div className="relative -mt-5">
-                {showAiScan && !isDetecting && (
-                  <span className="absolute -inset-1 rounded-full bg-emerald-400/50 animate-ping pointer-events-none" />
-                )}
+          {/* 5. Floating Live Cart Drawer (Floating Card matching user mockup) */}
+          {cart.length > 0 && (
+            <div className="relative z-30 mx-4 mb-4 bg-white/95 backdrop-blur-md rounded-3xl p-4 shadow-2xl border border-white/20 max-w-sm w-full mx-auto animate-slide-up">
+              {/* Drawer Header Row */}
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-[#16A34A]" />
+                  <h4 className="font-extrabold text-sm text-gray-900">Keranjang ({cartCount})</h4>
+                </div>
                 <button
-                  onClick={handleCaptureSnapshot}
-                  disabled={isDetecting}
-                  className={cn(
-                    'relative z-10 w-14 h-14 bg-gradient-to-tr from-[#16A34A] to-emerald-400 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 hover:scale-105 active:scale-95 transition-all border-4 border-black',
-                    isDetecting && 'opacity-70 cursor-not-allowed'
-                  )}
-                  title="Ambil Foto & Scan AI"
+                  onClick={() => setView('cart')}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900 font-medium transition-colors"
                 >
-                  <Camera className="w-7 h-7 text-white" />
+                  Subtotal <span className="font-extrabold text-gray-900 text-sm ml-0.5">Rp {subtotal?.toLocaleString('id-ID')}</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
 
-              {/* Manual Button */}
-              <button
-                onClick={() => { setShowAiScan(false); setShowBarcodeScan(false); setView('home'); }}
-                className="flex flex-col items-center gap-1 text-gray-300 hover:text-white transition-all"
-              >
-                <PenLine className="w-5 h-5" />
-                <span className="text-[10px] font-semibold">Manual</span>
-              </button>
+              {/* Scrollable Item List (Vertical Stack) */}
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1 hide-scrollbar">
+                {cart.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between bg-emerald-50/50 hover:bg-emerald-50 rounded-2xl p-2.5 transition-colors border border-emerald-100/50">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-1">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-100 text-[#16A34A] font-extrabold text-[11px] flex items-center justify-center shrink-0 border border-emerald-200">
+                        {item.nama?.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-xs text-gray-900 truncate" title={item.nama}>{item.nama}</p>
+                        <p className="text-[10px] text-gray-500 font-medium">{item.qty} x Rp {item.harga?.toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <p className="font-extrabold text-xs text-gray-900">Rp {(item.harga * item.qty).toLocaleString('id-ID')}</p>
+                      
+                      {/* Stepper Controls: Minus (-), Qty Count, Plus (+) */}
+                      <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl px-1 py-0.5 shadow-sm">
+                        <button
+                          onClick={() => updateQty(item.id, -1)}
+                          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                          title="Kurangi Qty"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="font-bold text-xs text-gray-900 px-0.5 min-w-[14px] text-center">{item.qty}</span>
+                        <button
+                          onClick={() => updateQty(item.id, 1)}
+                          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors"
+                          title="Tambah Qty"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Delete Item Button */}
+                      <button
+                        onClick={() => updateQty(item.id, -item.qty)}
+                        className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
+                        title="Hapus barang"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
       )}
 

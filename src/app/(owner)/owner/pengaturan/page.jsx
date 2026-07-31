@@ -248,6 +248,64 @@ export default function OwnerPengaturanPage() {
         </div>
       </div>
 
+      {/* Section 3: Ubah Kata Sandi Akun Cepat */}
+      <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs space-y-4">
+        <h3 className="text-sm font-bold text-gray-900 font-[family-name:var(--font-poppins)] flex items-center gap-2">
+          <Lock className="w-4 h-4 text-[#16A34A]" />
+          Keamanan & Ubah Kata Sandi Akun
+        </h3>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const passBaru = e.target.password_baru.value;
+            const konfirmPass = e.target.konfirm_password.value;
+
+            if (!passBaru || passBaru.length < 8) {
+              setFeedback({ isOpen: true, type: 'error', title: 'Validasi Gagal', message: 'Password baru minimal harus 8 karakter!' });
+              return;
+            }
+            if (passBaru !== konfirmPass) {
+              setFeedback({ isOpen: true, type: 'error', title: 'Validasi Gagal', message: 'Konfirmasi password baru tidak cocok!' });
+              return;
+            }
+
+            try {
+              const res = await api.post('/auth/reset-password', {
+                email: useAuthStore.getState().pengguna?.email || 'anoderb@gmail.com',
+                new_password: passBaru,
+              });
+              setFeedback({ isOpen: true, type: 'success', title: 'Password Diperbarui!', message: res?.pesan || 'Password akun Anda berhasil diperbarui!' });
+              e.target.reset();
+            } catch (err) {
+              setFeedback({ isOpen: true, type: 'error', title: 'Gagal Ubah Password', message: err.response?.data?.pesan || err.message });
+            }
+          }}
+          className="space-y-3.5 text-xs"
+        >
+          <Input
+            name="password_baru"
+            type="password"
+            label="Password Baru"
+            placeholder="Minimal 8 karakter"
+            required
+          />
+          <Input
+            name="konfirm_password"
+            type="password"
+            label="Konfirmasi Password Baru"
+            placeholder="Ulangi password baru"
+            required
+          />
+          <div className="pt-1">
+            <Button variant="primary" size="md" type="submit">
+              <Key className="w-4 h-4 mr-1.5" />
+              Ubah Password Sekarang
+            </Button>
+          </div>
+        </form>
+      </div>
+
       {/* Modal Form Tambah Kasir Baru */}
       <Modal
         isOpen={isModalOpen}
