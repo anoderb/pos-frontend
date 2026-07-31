@@ -43,6 +43,7 @@ export default function OwnerPengaturanPage() {
   // Feedback & Confirm Modal State
   const [feedback, setFeedback] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null, nama: '' });
+  const [confirmToggle, setConfirmToggle] = useState({ isOpen: false, kasir: null });
 
   useEffect(() => {
     fetchKasirList();
@@ -53,9 +54,7 @@ export default function OwnerPengaturanPage() {
       setIsLoading(true);
       const res = await api.get('/pengguna');
       if (res?.berhasil && Array.isArray(res.data)) {
-        // Filter kasir role or all staff
-        const kasirs = res.data.filter(u => u.role === 'kasir');
-        setStafList(kasirs);
+        setStafList(res.data.filter(u => u.role === 'kasir'));
       } else {
         setStafList([]);
       }
@@ -71,38 +70,36 @@ export default function OwnerPengaturanPage() {
     setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Profil Toko berhasil diperbarui!' });
   };
 
-  const handleAddKasir = async (e) => {
+  const handleCreateKasir = async (e) => {
     e.preventDefault();
-    if (!kasirForm.nama || !kasirForm.email || !kasirForm.password) {
-      setFeedback({ isOpen: true, type: 'error', title: 'Validasi Gagal', message: 'Semua field (Nama, Email, Password) wajib diisi!' });
-      return;
-    }
+    if (!kasirForm.nama || !kasirForm.email || !kasirForm.password) return;
 
     try {
       setIsSubmitting(true);
-      await api.post('/pengguna', kasirForm);
+      await api.post('/pengguna/kasir', kasirForm);
       setFeedback({
         isOpen: true,
         type: 'success',
-        title: 'Akun Kasir Dibuat!',
-        message: `Akun kasir untuk ${kasirForm.nama} (${kasirForm.email}) telah terverifikasi di Supabase Auth & siap untuk login.`,
+        title: 'Kasir Berhasil Dibuat!',
+        message: `Akun kasir untuk ${kasirForm.nama} (${kasirForm.email}) telah berhasil didaftarkan.`,
       });
       setIsModalOpen(false);
       setKasirForm({ nama: '', email: '', password: '' });
       fetchKasirList();
     } catch (err) {
-      setFeedback({
-        isOpen: true,
-        type: 'error',
-        title: 'Gagal Membuat Kasir',
-        message: err.response?.data?.pesan || err.message,
-      });
+      setFeedback({ isOpen: true, type: 'error', title: 'Gagal Membuat Kasir', message: err.message });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const toggleStatusKasir = async (kasir) => {
+  const toggleStatusKasir = (kasir) => {
+    setConfirmToggle({ isOpen: true, kasir });
+  };
+
+  const executeToggleStatusKasir = async () => {
+    if (!confirmToggle.kasir) return;
+    const kasir = confirmToggle.kasir;
     try {
       const nextStatus = !kasir.aktif;
       await api.put(`/pengguna/${kasir.id}`, { aktif: nextStatus });
@@ -112,6 +109,7 @@ export default function OwnerPengaturanPage() {
         title: 'Status Diperbarui',
         message: `Akun kasir ${kasir.nama} telah ${nextStatus ? 'diaktifkan kembali' : 'dinonaktifkan'}.`,
       });
+      setConfirmToggle({ isOpen: false, kasir: null });
       fetchKasirList();
     } catch (err) {
       setFeedback({ isOpen: true, type: 'error', title: 'Gagal Mengubah Status', message: err.message });
@@ -343,6 +341,17 @@ export default function OwnerPengaturanPage() {
           </Button>
         </form>
       </Modal>
+
+      {/* Confirm Toggle Status Modal */}
+      <ConfirmModal
+        isOpen={confirmToggle.isOpen}
+        onClose={() => setConfirmToggle({ isOpen: false, kasir: null })}
+        onConfirm={executeToggleStatusKasir}
+        title={confirmToggle.kasir?.aktif ? "Nonaktifkan Akun Kasir" : "Aktifkan Akun Kasir"}
+        message={`Apakah Anda yakin ingin ${confirmToggle.kasir?.aktif ? 'menonaktifkan' : 'mengaktifkan kembali'} kasir "${confirmToggle.kasir?.nama}"? ${confirmToggle.kasir?.aktif ? 'Kasir ini tidak akan bisa login ke sistem.' : 'Kasir ini dapat kembali login dan bertransaksi.'}`}
+        confirmText={confirmToggle.kasir?.aktif ? "Ya, Nonaktifkan" : "Ya, Aktifkan"}
+        isDanger={confirmToggle.kasir?.aktif}
+      />
 
       {/* Confirm Delete Modal */}
       <ConfirmModal

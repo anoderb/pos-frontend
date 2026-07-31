@@ -396,67 +396,106 @@ export default function OwnerProdukPage() {
       </div>
 
       {/* Mobile Compact Card List */}
-      <div className="space-y-2.5">
-        {filteredProduk.map((p) => {
-          const sj = p.satuan_jual?.[0] || {};
-          const isKritis = p.stok <= p.stok_minimum;
+      {filteredProduk.length > 0 ? (
+        <>
+          <div className="space-y-2.5">
+            {filteredProduk.slice((page - 1) * 20, page * 20).map((p) => {
+              const sj = p.satuan_jual?.[0] || {};
+              const isKritis = p.stok <= p.stok_minimum;
 
-          return (
-            <div
-              key={p.id}
-              className={cn(
-                'bg-white rounded-2xl p-4 border shadow-xs flex items-center justify-between gap-3 transition-all hover:border-[#16A34A]',
-                isKritis ? 'border-red-200 bg-red-50/20' : 'border-gray-100'
-              )}
-            >
-              <ProdukThumb nama={p.nama} img={p.img || p.fotos?.[0]} className="w-12 h-12 rounded-xl text-xs font-bold" />
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    'bg-white rounded-2xl p-4 border shadow-xs flex items-center justify-between gap-3 transition-all hover:border-[#16A34A]',
+                    isKritis ? 'border-red-200 bg-red-50/20' : 'border-gray-100'
+                  )}
+                >
+                  <ProdukThumb nama={p.nama} img={p.img || p.fotos?.[0]} className="w-12 h-12 rounded-xl text-xs font-bold" />
 
-              <div className="flex-1 min-w-0">
-                <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate">{p.nama}</h4>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-[10px] font-mono text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
-                    {p.barcode || 'NO-BARCODE'}
-                  </span>
-                  <span
-                    className={cn(
-                      'text-[10px] font-bold px-2 py-0.5 rounded-full',
-                      isKritis ? 'bg-red-100 text-[#EF4444]' : 'bg-emerald-50 text-[#16A34A]'
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate">{p.nama}</h4>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[10px] font-mono text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
+                        {p.barcode || 'NO-BARCODE'}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                          isKritis ? 'bg-red-100 text-[#EF4444]' : 'bg-emerald-50 text-[#16A34A]'
+                        )}
+                      >
+                        Stok: {p.stok} {p.satuan_dasar?.nama || 'pcs'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Price & Action */}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs sm:text-sm font-extrabold text-[#16A34A]">
+                      {formatRupiah(sj.harga_ecer || 0)}
+                    </p>
+                    {sj.harga_grosir && (
+                      <p className="text-[10px] font-medium text-gray-500 mt-0.5">
+                        Grosir: <span className="font-bold text-gray-700">{formatRupiah(sj.harga_grosir)}</span> (min {sj.min_qty_grosir})
+                      </p>
                     )}
-                  >
-                    Stok: {p.stok} {p.satuan_dasar?.nama || 'pcs'}
-                  </span>
+                    <div className="flex justify-end gap-1.5 mt-2">
+                      <button
+                        onClick={() => handleOpenEdit(p)}
+                        className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Price & Action */}
-              <div className="text-right shrink-0">
-                <p className="text-xs sm:text-sm font-extrabold text-[#16A34A]">
-                  {formatRupiah(sj.harga_ecer || 0)}
-                </p>
-                {sj.harga_grosir && (
-                  <p className="text-[10px] font-medium text-gray-500 mt-0.5">
-                    Grosir: <span className="font-bold text-gray-700">{formatRupiah(sj.harga_grosir)}</span> (min {sj.min_qty_grosir})
-                  </p>
-                )}
-                <div className="flex justify-end gap-1.5 mt-2">
-                  <button
-                    onClick={() => handleOpenEdit(p)}
-                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+          {/* Pagination Controls (BUG-13) */}
+          {filteredProduk.length > 20 && (
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs text-gray-500">
+              <span>Menampilkan {((page - 1) * 20) + 1} - {Math.min(page * 20, filteredProduk.length)} dari {filteredProduk.length} produk</span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl disabled:opacity-40 font-bold hover:bg-gray-50"
+                >
+                  ← Prev
+                </button>
+                <span className="font-bold text-gray-700">{page} / {Math.ceil(filteredProduk.length / 20)}</span>
+                <button
+                  disabled={page >= Math.ceil(filteredProduk.length / 20)}
+                  onClick={() => setPage(p => p + 1)}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl disabled:opacity-40 font-bold hover:bg-gray-50"
+                >
+                  Next →
+                </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </>
+      ) : (
+        /* Empty State Feedback (BUG-11) */
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center shadow-xs">
+          <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-2 text-[#16A34A]">
+            <Package className="w-6 h-6" />
+          </div>
+          <h4 className="text-sm font-bold text-gray-900 mb-1">Produk Tidak Ditemukan</h4>
+          <p className="text-xs text-gray-400">
+            {search ? `Tidak ada produk dengan kata kunci "${search}". Coba kata kunci lain atau scan barcode.` : 'Belum ada produk terdaftar di toko Anda.'}
+          </p>
+        </div>
+      )}
 
       {/* Modal Add / Edit Produk */}
       <Modal

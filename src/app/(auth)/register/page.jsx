@@ -39,6 +39,14 @@ export default function RegisterPage() {
       return;
     }
 
+    if (formData.no_telp_toko) {
+      const PHONE_REGEX = /^(\+62|62|0)8[1-9][0-9]{6,10}$/;
+      if (!PHONE_REGEX.test(formData.no_telp_toko.trim())) {
+        setErrorMsg('Format nomor telepon toko tidak valid (contoh: 08123456789)');
+        return;
+      }
+    }
+
     try {
       setIsLoading(true);
       await api.post('/auth/register', formData);

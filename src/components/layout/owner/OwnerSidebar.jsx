@@ -94,7 +94,7 @@ export default function OwnerSidebar() {
             </p>
             {group.items.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || (item.href !== '/owner/dashboard' && pathname.startsWith(item.href + '/'));
 
               return (
                 <Link

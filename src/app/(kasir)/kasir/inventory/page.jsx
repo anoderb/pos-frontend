@@ -17,27 +17,36 @@ function ProdukThumb({ nama, className }) {
 
 export default function KasirInventoryPage() {
   const [produkList, setProdukList] = useState([]);
+  const [kategoriList, setKategoriList] = useState([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('semua');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchProduk();
+    fetchKategori();
   }, []);
 
   const fetchProduk = async () => {
     try {
       setIsLoading(true);
       const res = await api.get('/produk');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        setProdukList(res.data);
-      } else {
-        setProdukList([]);
-      }
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setProdukList(data);
     } catch {
       setProdukList([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchKategori = async () => {
+    try {
+      const res = await api.get('/kategori');
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setKategoriList(data);
+    } catch {
+      setKategoriList([]);
     }
   };
 
@@ -50,7 +59,7 @@ export default function KasirInventoryPage() {
 
     if (categoryFilter === 'semua') return true;
     if (categoryFilter === 'kritis') return p.stok <= p.stok_minimum;
-    return p.kategori?.toLowerCase() === categoryFilter.toLowerCase();
+    return p.kategori_id === categoryFilter || p.kategori?.nama?.toLowerCase() === categoryFilter.toLowerCase();
   });
 
   const kritisCount = produkList.filter(p => p.stok <= p.stok_minimum).length;
@@ -88,15 +97,31 @@ export default function KasirInventoryPage() {
         />
       </div>
 
-      {/* Category Filters */}
+      {/* Dynamic Category Filters (BUG-19 Fix) */}
       <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-        {[
-          { id: 'semua', label: 'Semua Produk' },
-          { id: 'kritis', label: `Stok Kritis (${kritisCount})` },
-          { id: 'makanan', label: 'Makanan' },
-          { id: 'minuman', label: 'Minuman' },
-          { id: 'sembako', label: 'Sembako' },
-        ].map((cat) => (
+        <button
+          onClick={() => setCategoryFilter('semua')}
+          className={cn(
+            'px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all border',
+            categoryFilter === 'semua'
+              ? 'bg-[#16A34A] text-white border-[#16A34A] shadow-xs'
+              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+          )}
+        >
+          Semua Produk
+        </button>
+        <button
+          onClick={() => setCategoryFilter('kritis')}
+          className={cn(
+            'px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all border',
+            categoryFilter === 'kritis'
+              ? 'bg-[#16A34A] text-white border-[#16A34A] shadow-xs'
+              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+          )}
+        >
+          Stok Kritis ({kritisCount})
+        </button>
+        {kategoriList.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setCategoryFilter(cat.id)}
@@ -107,7 +132,7 @@ export default function KasirInventoryPage() {
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
             )}
           >
-            {cat.label}
+            {cat.nama}
           </button>
         ))}
       </div>

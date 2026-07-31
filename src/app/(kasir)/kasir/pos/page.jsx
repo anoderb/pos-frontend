@@ -295,7 +295,7 @@ export default function KasirPosPage() {
 
   const subtotal = cart.reduce((s, i) => s + i.harga * i.qty, 0);
   const total = Math.max(0, subtotal - diskon);
-  const uangNum = Number(uangDiterima) || 0;
+  const uangNum = uangDiterima === '' ? total : (Number(uangDiterima) || 0);
   const kembalian = Math.max(0, uangNum - total);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
