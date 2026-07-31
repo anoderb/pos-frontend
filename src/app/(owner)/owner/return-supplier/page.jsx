@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   RotateCcw,
   Plus,
@@ -15,9 +15,11 @@ import { cn, formatRupiah } from '@/lib/utils';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import { api } from '@/lib/api';
 
 export default function OwnerReturnSupplierPage() {
   const [returnList, setReturnList] = useState([]);
+  const [supplierList, setSupplierList] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     supplier: '',
@@ -27,20 +29,43 @@ export default function OwnerReturnSupplierPage() {
     nilai: 0,
   });
 
-  const handleCreate = (e) => {
+  useEffect(() => {
+    api.get('/owner/supplier').then(res => {
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setSupplierList(data);
+    }).catch(() => {});
+
+    api.get('/owner/return-supplier').then(res => {
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setReturnList(data);
+    }).catch(() => {});
+  }, []);
+
+  const handleCreate = async (e) => {
     e.preventDefault();
-    const newRet = {
-      id: 'ret-' + Date.now(),
-      nomorRetur: 'RET-260730-00' + (returnList.length + 1),
-      supplier: formData.supplier,
-      tanggal: '30 Jul 2026',
-      produk: `${formData.produk} (${formData.alasan})`,
-      qty: Number(formData.qty),
-      totalNilai: Number(formData.nilai),
-      status: 'Diproses',
-    };
-    setReturnList(prev => [newRet, ...prev]);
-    setIsModalOpen(false);
+    try {
+      const supplier = supplierList.find(s => s.nama?.toLowerCase() === formData.supplier?.toLowerCase());
+      await api.post('/owner/return-supplier', {
+        supplier_id: supplier?.id || null,
+        total: Number(formData.nilai),
+        alasan: formData.alasan,
+        catatan: formData.produk,
+        items: [{
+          produk_id: null,
+          nama_produk: formData.produk,
+          satuan: 'pcs',
+          qty: Number(formData.qty),
+          harga_beli: Number(formData.nilai) / Math.max(1, Number(formData.qty)),
+          subtotal: Number(formData.nilai),
+        }],
+      });
+      setIsModalOpen(false);
+      const res = await api.get('/owner/return-supplier');
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setReturnList(data);
+    } catch (err) {
+      alert('Gagal: ' + (err?.message || 'Terjadi kesalahan'));
+    }
   };
 
   return (

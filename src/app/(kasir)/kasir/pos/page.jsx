@@ -188,7 +188,7 @@ export default function KasirPosPage() {
 
   const fetchPelanggan = async () => {
     try {
-      const res = await api.get('/pelanggan');
+      const res = await api.get('/kasir/pelanggan');
       const base = [{ id: 'umum', nama: 'Pelanggan Umum', no_hp: '' }];
       if (res?.berhasil && Array.isArray(res.data)) {
         setPelangganList([...base, ...res.data]);
@@ -606,7 +606,7 @@ export default function KasirPosPage() {
     // Save base64 snapshot to evaluation retraining log
     const snap = lastSnapshotRef.current;
     if (snap && lastPredictionsMetadata) {
-      api.post('/ai/koreksi', {
+      api.post('/kasir/ai/koreksi', {
         foto_base64: snap,
         prediksi_1_produk_id: lastPredictionsMetadata.pred_1_prod_id,
         prediksi_1_confidence: lastPredictionsMetadata.pred_1_conf,

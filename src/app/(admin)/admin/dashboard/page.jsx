@@ -35,17 +35,7 @@ export default function AdminDashboardPage() {
         setMetrics(res.data);
       }
     } catch (err) {
-      // Demo fallback if API delay
-      setMetrics({
-        toko: { total: 1, total_pengguna: 2, total_produk: 26 },
-        ai: {
-          total_class: 26,
-          total_foto_dataset: 4800,
-          total_koreksi_pending: 0,
-          model_aktif: { versi: 'v1.0-prod', akurasi: 0.958, status: 'aktif' },
-        },
-        recent_logs: [],
-      });
+      setMetrics(null);
     } finally {
       setIsLoading(false);
     }
@@ -54,8 +44,8 @@ export default function AdminDashboardPage() {
   const statCards = [
     {
       title: 'Total Tenant Toko',
-      value: metrics?.toko?.total || 1,
-      subtext: `${metrics?.toko?.total_pengguna || 2} Total Pengguna Toko`,
+      value: metrics?.toko?.total || 0,
+      subtext: `${metrics?.toko?.total_pengguna || 0} Total Pengguna Toko`,
       icon: Store,
       color: 'from-blue-500 to-indigo-600',
     },

@@ -17,50 +17,93 @@ import Button from '@/components/ui/Button';
 import { api } from '@/lib/api';
 
 export default function OwnerStockOpnamePage() {
-  const [tahap, setTahap] = useState(1); // 1: Pilih Sesi, 2: Input Fisik, 3: Final Approval
+  const [opnameList, setOpnameList] = useState([]);
+  const [activeOpname, setActiveOpname] = useState(null);
   const [items, setItems] = useState([]);
+  const [tahap, setTahap] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalized, setIsFinalized] = useState(false);
 
-  useEffect(() => {
-    fetchProdukForOpname();
-  }, []);
-
-  const fetchProdukForOpname = async () => {
+  // Fetch daftar opname
+  const fetchOpnameList = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/produk');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        const normalized = res.data.map(p => ({
-          id: p.id,
-          nama: p.nama,
-          stokSistem: Number(p.stok || 0),
-          stokFisik: Number(p.stok || 0),
-          hargaEcer: Number(p.produk_satuan_jual?.[0]?.harga_ecer || p.hpp || 0),
-        }));
-        setItems(normalized);
-      } else {
-        setItems([]);
+      const res = await api.get('/owner/opname');
+      const data = res?.berhasil && Array.isArray(res.data) ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      setOpnameList(data);
+      const draft = data.find(o => o.status === 'draft' || o.status === 'review');
+      if (draft) {
+        setActiveOpname(draft);
+        setTahap(draft.status === 'review' ? 2 : 1);
+        fetchOpnameDetail(draft.id);
       }
-    } catch {
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch { setOpnameList([]); }
+    finally { setIsLoading(false); }
   };
 
+  // Fetch detail opname + items
+  const fetchOpnameDetail = async (opnameId) => {
+    try {
+      const res = await api.get(`/owner/opname/${opnameId}`);
+      const data = res?.berhasil ? res.data : (res?.data || null);
+      if (data) {
+        setActiveOpname(data);
+        setItems((data.items || []).map(item => ({
+          id: item.produk_id,
+          nama: item.nama_produk,
+          stokSistem: Number(item.stok_sistem || 0),
+          stokFisik: item.stok_fisik !== null ? Number(item.stok_fisik) : Number(item.stok_sistem || 0),
+          selisih: Number(item.selisih || 0),
+          nilaiSelisih: Number(item.nilai_selisih || 0),
+          hargaEcer: Number(item.harga_satuan || 0),
+        })));
+      }
+    } catch {}
+  };
+
+  // 1️⃣ Buat opname baru
+  const handleBuatOpname = async () => {
+    try {
+      const res = await api.post('/owner/opname', { tanggal: new Date().toISOString().slice(0, 10) });
+      if (res?.berhasil && res.data) {
+        setActiveOpname(res.data);
+        setTahap(2);
+        fetchOpnameDetail(res.data.id);
+      }
+    } catch (err) { alert('Gagal: ' + (err?.message || 'Terjadi kesalahan')); }
+  };
+
+  // 2️⃣ Update stok fisik per produk (local state)
   const handleUpdateFisik = (id, val) => {
     const numVal = Math.max(0, Number(val) || 0);
     setItems(prev => prev.map(item => item.id === id ? { ...item, stokFisik: numVal } : item));
   };
 
-  const totalSelisihUnit = items.reduce((acc, item) => acc + (item.stokFisik - item.stokSistem), 0);
-  const totalNilaiSelisih = items.reduce((acc, item) => acc + ((item.stokFisik - item.stokSistem) * item.hargaEcer), 0);
-
-  const handleFinalApprove = () => {
-    setIsFinalized(true);
-    alert('Stock Opname Berhasil Disetujui & Stok Sistem Telah Diperbarui!');
+  // Simpan fisik + submit review
+  const handleSimpanFisik = async () => {
+    try {
+      for (const item of items) {
+        await api.put(`/owner/opname/${activeOpname.id}/item/${item.id}`, { stok_fisik: item.stokFisik });
+      }
+      await api.post(`/owner/opname/${activeOpname.id}/review`);
+      setTahap(3);
+      fetchOpnameDetail(activeOpname.id);
+    } catch (err) { alert('Gagal: ' + (err?.message || 'Terjadi kesalahan')); }
   };
+
+  const totalSelisihUnit = items.reduce((acc, item) => acc + (item.stokFisik - item.stokSistem), 0);
+  const totalNilaiSelisih = items.reduce((acc, item) => acc + ((item.stokFisik - item.stokSistem) * (item.hargaEcer || 0)), 0);
+
+  // 3️⃣ Finalize
+  const handleFinalApprove = async () => {
+    try {
+      await api.post(`/owner/opname/${activeOpname.id}/final`);
+      setIsFinalized(true);
+      fetchOpnameList();
+    } catch (err) { alert('Gagal: ' + (err?.message || 'Terjadi kesalahan')); }
+  };
+
+  useEffect(() => { fetchOpnameList(); }, []);
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 pb-20">
@@ -75,7 +118,7 @@ export default function OwnerStockOpnamePage() {
 
         {tahap === 1 && (
           <button
-            onClick={() => setTahap(2)}
+            onClick={handleBuatOpname}
             className="flex items-center gap-1.5 px-3 py-2 bg-[#16A34A] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#15803D] transition-all"
           >
             <Plus className="w-4 h-4" />
@@ -116,8 +159,10 @@ export default function OwnerStockOpnamePage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                 Sesi Aktif
               </span>
-              <h3 className="text-sm font-bold text-gray-900">Opname Akhir Bulan Juli 2026</h3>
-              <p className="text-xs text-gray-400">Dibuat: 30 Juli 2026 oleh Owner</p>
+              <h3 className="text-sm font-bold text-gray-900">{activeOpname?.nomor_opname || 'Opname'}</h3>
+              <p className="text-xs text-gray-400">
+                Dibuat: {activeOpname?.created_at ? new Date(activeOpname.created_at).toLocaleDateString('id-ID') : '-'} • Status: {activeOpname?.status || '-'}
+              </p>
             </div>
             <button
               onClick={() => setTahap(2)}

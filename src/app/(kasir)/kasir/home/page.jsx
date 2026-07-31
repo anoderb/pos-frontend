@@ -33,8 +33,8 @@ export default function KasirHomePage() {
     try {
       setIsLoading(true);
       const [shiftRes, txRes] = await Promise.all([
-        api.get('/kasir/shift').catch(() => null),
-        api.get('/transaksi').catch(() => null),
+        api.get('/kasir/shift/aktif').catch(() => null),
+        api.get('/kasir/transaksi').catch(() => null),
       ]);
 
       if (shiftRes?.berhasil && shiftRes.data) {

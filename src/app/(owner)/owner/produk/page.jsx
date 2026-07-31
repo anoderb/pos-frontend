@@ -72,14 +72,22 @@ export default function OwnerProdukPage() {
   const [filterStok, setFilterStok] = useState('semua');
   const [isLoading, setIsLoading] = useState(true);
 
+  const [satuanOptions, setSatuanOptions] = useState(SATUAN_ECERAN_OPTIONS);
+
   useEffect(() => {
     fetchProduk();
+    api.get('/owner/satuan').then(res => {
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data) && data.length > 0) {
+        setSatuanOptions(data.map(s => ({ value: s.kode || s.nama, label: `${s.kode || s.nama} (${s.nama})` })));
+      }
+    }).catch(() => {});
   }, []);
 
   const fetchProduk = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/produk');
+      const res = await api.get('/owner/produk');
       if (res?.berhasil && Array.isArray(res.data)) {
         setProdukList(res.data);
       } else {

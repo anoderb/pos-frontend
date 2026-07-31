@@ -18,6 +18,8 @@ import { api } from '@/lib/api';
 
 export default function OwnerLaporanPage() {
   const [rentang, setRentang] = useState('bulan_ini');
+  const [tanggalMulai, setTanggalMulai] = useState('');
+  const [tanggalSelesai, setTanggalSelesai] = useState('');
   const [laporanSummary, setLaporanSummary] = useState({
     totalOmset: 0,
     totalHpp: 0,
@@ -28,22 +30,42 @@ export default function OwnerLaporanPage() {
   const [metodePembayaran, setMetodePembayaran] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Hitung rentang tanggal berdasarkan pilihan
   useEffect(() => {
-    fetchLaporan();
+    const now = new Date();
+    if (rentang === 'hari_ini') {
+      const d = now.toISOString().slice(0, 10);
+      setTanggalMulai(d); setTanggalSelesai(d);
+    } else if (rentang === '7_hari') {
+      const end = now.toISOString().slice(0, 10);
+      const start = new Date(now - 7*86400000).toISOString().slice(0, 10);
+      setTanggalMulai(start); setTanggalSelesai(end);
+    } else if (rentang === 'bulan_ini') {
+      setTanggalMulai(now.toISOString().slice(0, 7) + '-01');
+      setTanggalSelesai(now.toISOString().slice(0, 10));
+    } else if (rentang === 'bulan_lalu') {
+      const last = new Date(now.getFullYear(), now.getMonth(), 0);
+      setTanggalMulai(last.toISOString().slice(0, 7) + '-01');
+      setTanggalSelesai(last.toISOString().slice(0, 10));
+    }
   }, [rentang]);
 
   const fetchLaporan = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/transaksi');
-      const txs = Array.isArray(res?.data) ? res.data : [];
+      const [penjualanRes, labaRugiRes] = await Promise.all([
+        api.get('/owner/laporan/penjualan', { 
+          params: { tanggal_mulai: tanggalMulai, tanggal_selesai: tanggalSelesai } 
+        }).catch(() => null),
+        api.get('/owner/laporan/laba-rugi', {
+          params: { tanggal_mulai: tanggalMulai, tanggal_selesai: tanggalSelesai }
+        }).catch(() => null),
+      ]);
 
-      let omset = 0;
-      let diskon = 0;
-      let cash = 0;
-      let qris = 0;
-      let transfer = 0;
+      const txs = Array.isArray(penjualanRes?.data) ? penjualanRes.data : (Array.isArray(penjualanRes) ? penjualanRes : []);
+      const labaRugi = labaRugiRes?.data || labaRugiRes || {};
 
+      let omset = 0, diskon = 0, cash = 0, qris = 0, transfer = 0;
       txs.forEach(t => {
         const tot = Number(t.total || 0);
         omset += tot;
@@ -54,35 +76,33 @@ export default function OwnerLaporanPage() {
         else transfer += tot;
       });
 
-      const hpp = Math.round(omset * 0.7);
-      const labaKotor = omset - hpp;
-      const labaBersih = Math.max(0, labaKotor - diskon);
-
       setLaporanSummary({
         totalOmset: omset,
-        totalHpp: hpp,
-        labaKotor: labaKotor,
+        totalHpp: Number(labaRugi.total_hpp || 0),
+        labaKotor: omset - Number(labaRugi.total_hpp || 0),
         diskonKasir: diskon,
-        labaBersih: labaBersih,
+        labaBersih: Number(labaRugi.estimasi_laba_kotor || (omset - Number(labaRugi.total_hpp || 0) - diskon)),
       });
 
       const totalValid = omset || 1;
       setMetodePembayaran([
         { nama: 'Tunai (Cash)', total: cash, persentase: Math.round((cash / totalValid) * 100) },
-        { nama: 'QRIS Statis/Dinamis', total: qris, persentase: Math.round((qris / totalValid) * 100) },
+        { nama: 'QRIS', total: qris, persentase: Math.round((qris / totalValid) * 100) },
         { nama: 'Transfer Bank', total: transfer, persentase: Math.round((transfer / totalValid) * 100) },
       ]);
     } catch {
       setLaporanSummary({ totalOmset: 0, totalHpp: 0, labaKotor: 0, diskonKasir: 0, labaBersih: 0 });
-      setMetodePembayaran([
-        { nama: 'Tunai (Cash)', total: 0, persentase: 0 },
-        { nama: 'QRIS Statis/Dinamis', total: 0, persentase: 0 },
-        { nama: 'Transfer Bank', total: 0, persentase: 0 },
-      ]);
+      setMetodePembayaran([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (tanggalMulai && tanggalSelesai) fetchLaporan();
+  }, [tanggalMulai, tanggalSelesai]);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
@@ -97,14 +117,14 @@ export default function OwnerLaporanPage() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => alert('Mengunduh Laporan PDF...')}
+            onClick={() => window.open(`${API_BASE_URL}/owner/laporan/penjualan/export?tanggal_mulai=${tanggalMulai}&tanggal_selesai=${tanggalSelesai}&format=pdf`, '_blank')}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 active:scale-95 transition-all shadow-xs"
           >
             <FileText className="w-4 h-4 text-red-500" />
             <span>Export PDF</span>
           </button>
           <button
-            onClick={() => alert('Mengunduh Laporan Excel...')}
+            onClick={() => window.open(`${API_BASE_URL}/owner/laporan/penjualan/export?tanggal_mulai=${tanggalMulai}&tanggal_selesai=${tanggalSelesai}&format=excel`, '_blank')}
             className="flex items-center gap-1.5 px-3 py-2 bg-[#16A34A] text-white rounded-xl text-xs font-bold hover:bg-[#15803D] active:scale-95 transition-all shadow-xs"
           >
             <FileSpreadsheet className="w-4 h-4" />

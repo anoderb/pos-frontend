@@ -40,7 +40,7 @@ export default function InventoryPage() {
   const fetchProduk = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/produk');
+      const res = await api.get('/kasir/produk');
       if (res?.berhasil && Array.isArray(res.data)) {
         setProdukList(res.data);
       } else {
@@ -122,9 +122,13 @@ export default function InventoryPage() {
         isLoading={isLoading}
         emptyMessage="Belum ada data produk terdaftar."
         renderRow={(p) => {
-          const hargaJual = p.satuan_jual && p.satuan_jual.length > 0
-            ? p.satuan_jual[0].harga_ecer
-            : 0;
+          const hargaJual = Number(
+            (p.satuan_jual && p.satuan_jual.length > 0 ? p.satuan_jual[0].harga_ecer : null) ??
+            p.harga_jual_default ??
+            p.harga_jual ??
+            p.harga_ecer ??
+            0
+          );
 
           return (
             <tr key={p.id} className="hover:bg-gray-50/50">

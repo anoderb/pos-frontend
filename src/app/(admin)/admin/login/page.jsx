@@ -9,8 +9,8 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { loginAdmin, loginDemoAdmin, isLoading } = useAdminAuthStore();
 
-  const [email, setEmail] = useState('admin@tokiva.biz.id');
-  const [password, setPassword] = useState('Admin123!@#');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 

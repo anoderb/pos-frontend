@@ -18,7 +18,7 @@ export default function KasirShiftPage() {
   const fetchActiveShift = async () => {
     try {
       setIsShiftLoading(true);
-      const res = await api.get('/kasir/shift');
+      const res = await api.get('/kasir/shift/aktif');
       if (res?.berhasil && res.data) {
         setShiftAktif(res.data);
       } else {
@@ -61,39 +61,45 @@ export default function KasirShiftPage() {
   const kasNum = Number(kasAktual) || 0;
   const selisih = kasNum - totalEkspektasi;
 
-  const handleBukaShift = (e) => {
+  const handleBukaShift = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    api.post('/kasir/shift/buka', { modal_awal: Number(modalAwal) }).catch(() => {});
-    setTimeout(() => {
-      setShiftAktif({
-        id: `SHF-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-001`,
-        waktu_buka: new Date().toISOString(),
-        modal_awal: Number(modalAwal),
-        status: 'buka',
-        total_penjualan_cash: 0,
-        total_penjualan_qris: 0,
-        total_transaksi: 0,
-        metode_terbanyak: '-',
-        metode_persen: 0,
-      });
+    try {
+      const res = await api.post('/kasir/shift/buka', { modal_awal: Number(modalAwal) });
+      if (res?.berhasil && res.data) {
+        setShiftAktif(res.data);
+      } else {
+        fetchActiveShift();
+      }
       setIsBukaModalOpen(false);
+    } catch (err) {
+      alert('Gagal membuka shift: ' + (err?.message || 'Terjadi kesalahan'));
+    } finally {
       setIsLoading(false);
-    }, 600);
+    }
   };
 
-  const handleTutupShift = (e) => {
+  const handleTutupShift = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    const closed = { ...shiftAktif, kas_aktual: kasNum, selisih };
-    api.post('/kasir/shift/tutup', { shift_id: shiftAktif.id, kas_aktual: kasNum }).catch(() => {});
-    setTimeout(() => {
-      setLastClosed(closed);
+    try {
+      const res = await api.post('/kasir/shift/tutup', { 
+        shift_id: shiftAktif?.id, 
+        kas_aktual: kasNum 
+      });
+      if (res?.berhasil && res.data) {
+        setLastClosed(res.data);
+      } else {
+        setLastClosed({ ...shiftAktif, kas_aktual: kasNum, selisih });
+      }
       setShiftAktif(null);
       setIsTutupModalOpen(false);
       setIsZReportOpen(true);
+    } catch (err) {
+      alert('Gagal menutup shift: ' + (err?.message || 'Terjadi kesalahan'));
+    } finally {
       setIsLoading(false);
-    }, 600);
+    }
   };
 
   const shiftDate = shiftAktif

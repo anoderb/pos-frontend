@@ -53,8 +53,8 @@ export default function PosPage() {
   const fetchProduk = async () => {
     try {
       setIsLoading(true);
-      // Fetch dari Endpoint Kasir Namespace (/api/kasir/produk)
-      const res = await api.get('/produk');
+      // Fetch dari Endpoint Kasir Namespace (/kasir/produk)
+      const res = await api.get('/kasir/produk');
       if (res?.berhasil && Array.isArray(res.data)) {
         setProdukList(res.data);
       } else {

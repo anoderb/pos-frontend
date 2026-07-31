@@ -38,23 +38,18 @@ export default function OwnerDashboardPage() {
   const fetchDashboard = async () => {
     try {
       setIsLoading(true);
-      const [dashRes, prodRes] = await Promise.all([
-        api.get('/owner/dashboard').catch(() => null),
-        api.get('/produk').catch(() => null),
-      ]);
+      const dashRes = await api.get('/owner/dashboard').catch(() => null);
 
-      const dash = dashRes?.data || {};
-      const prods = Array.isArray(prodRes?.data) ? prodRes.data : [];
-      const stokKritisCount = prods.filter(p => Number(p.stok || 0) <= Number(p.stok_minimum || 5)).length;
+      const dash = dashRes?.data || dashRes || {};
 
       setStats({
         omset: Number(dash.omzet_hari_ini || dash.omset || 0),
-        labaBersih: Number(dash.laba_bersih || dash.labaBersih || Math.round((dash.omzet_hari_ini || 0) * 0.25)),
+        labaBersih: Number(dash.estimasi_laba || dash.laba_bersih || 0),
         totalTx: Number(dash.total_transaksi_hari_ini || dash.totalTx || 0),
-        stokKritis: stokKritisCount,
+        stokKritis: Number(dash.total_stok_kritis || 0),
       });
 
-      setTopBestSeller(Array.isArray(dash.top_best_seller) ? dash.top_best_seller : []);
+      setTopBestSeller(Array.isArray(dash.stok_kritis_list) ? dash.stok_kritis_list : (Array.isArray(dash.top_best_seller) ? dash.top_best_seller : []));
     } catch {
       setStats({ omset: 0, labaBersih: 0, totalTx: 0, stokKritis: 0 });
       setTopBestSeller([]);
@@ -109,8 +104,7 @@ export default function OwnerDashboardPage() {
           </div>
           <p className="text-lg font-bold text-gray-900">{formatRupiah(stats.omset)}</p>
           <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>+12.4% vs kemarin</span>
+            <span>Perkembangan hari ini</span>
           </div>
         </div>
 
@@ -124,8 +118,7 @@ export default function OwnerDashboardPage() {
           </div>
           <p className="text-lg font-bold text-[#16A34A]">{formatRupiah(stats.labaBersih)}</p>
           <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
-            <ArrowUpRight className="w-3 h-3" />
-            <span>Margin 29.3%</span>
+            <span>Margin {stats.omset > 0 ? Math.round((stats.labaBersih / stats.omset) * 100) : 0}%</span>
           </div>
         </div>
 
@@ -138,7 +131,13 @@ export default function OwnerDashboardPage() {
             </div>
           </div>
           <p className="text-lg font-bold text-gray-900">{stats.totalTx} Struk</p>
-          <p className="text-[10px] text-gray-400 font-medium">Rata-rata: Rp 75.780/tx</p>
+          {stats.totalTx > 0 ? (
+            <p className="text-[10px] text-gray-400 font-medium">
+              Rata-rata: {formatRupiah(Math.round(stats.omset / stats.totalTx))}/tx
+            </p>
+          ) : (
+            <p className="text-[10px] text-gray-400 font-medium">Belum ada transaksi</p>
+          )}
         </div>
 
         {/* Stok Kritis Card */}

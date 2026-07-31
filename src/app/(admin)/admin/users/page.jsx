@@ -174,7 +174,7 @@ export default function AdminUsersPage() {
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-400 text-[11px] font-semibold border border-rose-500/20">
-                              <Ban className="w-3 h-3" /> Suspended
+                              <Ban className="w-3 h-3" /> Dinonaktifkan
                             </span>
                           )}
                         </td>

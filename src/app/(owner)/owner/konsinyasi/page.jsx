@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Handshake,
   Plus,
@@ -11,12 +11,48 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { cn, formatRupiah } from '@/lib/utils';
+import { api } from '@/lib/api';
 
 export default function OwnerKonsinyasiPage() {
   const [vendorList, setVendorList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const totalOmsetKonsinyasi = vendorList.reduce((acc, v) => acc + (v.terjualQty * v.hargaJual), 0);
-  const totalKomisiToko = vendorList.reduce((acc, v) => acc + (v.terjualQty * v.hargaJual * (v.komisiTokoPct / 100)), 0);
+  useEffect(() => {
+    api.get('/owner/konsinyasi').then(res => {
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setVendorList(data);
+    }).catch(() => {}).finally(() => setIsLoading(false));
+  }, []);
+
+  const handleTambah = () => {
+    // TODO: Integrasikan dengan modal form — POST /owner/konsinyasi
+    alert('Form tambah konsinyasi — integrasikan dengan modal komponen');
+  };
+
+  const handleBayar = async (konsinyasiId) => {
+    const jumlah = prompt('Jumlah pembayaran:');
+    if (!jumlah) return;
+    try {
+      await api.post(`/owner/konsinyasi/${konsinyasiId}/bayar`, { jumlah_bayar: Number(jumlah) });
+      const res = await api.get('/owner/konsinyasi');
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setVendorList(data);
+    } catch (err) { alert('Gagal: ' + (err?.message || 'Terjadi kesalahan')); }
+  };
+
+  const handleKembali = async (konsinyasiId, itemId) => {
+    const qty = prompt('Jumlah dikembalikan:');
+    if (!qty) return;
+    try {
+      await api.post(`/owner/konsinyasi/${konsinyasiId}/kembali`, { item_id: itemId, qty_kembali: Number(qty) });
+      const res = await api.get('/owner/konsinyasi');
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setVendorList(data);
+    } catch (err) { alert('Gagal: ' + (err?.message || 'Terjadi kesalahan')); }
+  };
+
+  const totalOmsetKonsinyasi = vendorList.reduce((acc, v) => acc + Number(v.terjualQty || 0) * Number(v.hargaJual || 0), 0);
+  const totalKomisiToko = vendorList.reduce((acc, v) => acc + Number(v.terjualQty || 0) * Number(v.hargaJual || 0) * (Number(v.komisiTokoPct || 0) / 100), 0);
   const totalSetoranVendor = totalOmsetKonsinyasi - totalKomisiToko;
 
   return (
@@ -31,7 +67,7 @@ export default function OwnerKonsinyasiPage() {
         </div>
 
         <button
-          onClick={() => alert('Fitur Tambah Vendor Konsinyasi Baru')}
+          onClick={handleTambah}
           className="flex items-center gap-1.5 px-3 py-2 bg-[#16A34A] text-white rounded-xl text-xs font-bold shadow-sm hover:bg-[#15803D] transition-all"
         >
           <Plus className="w-4 h-4" />

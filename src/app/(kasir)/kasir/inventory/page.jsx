@@ -30,7 +30,7 @@ export default function KasirInventoryPage() {
   const fetchProduk = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/produk');
+      const res = await api.get('/kasir/produk');
       const data = Array.isArray(res) ? res : (res?.data || []);
       setProdukList(data);
     } catch {
@@ -42,7 +42,7 @@ export default function KasirInventoryPage() {
 
   const fetchKategori = async () => {
     try {
-      const res = await api.get('/kategori');
+      const res = await api.get('/kasir/kategori');
       const data = Array.isArray(res) ? res : (res?.data || []);
       setKategoriList(data);
     } catch {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   PackagePlus,
   Plus,
@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 const SATUAN_GROSIR_OPTIONS = [
   { value: 'Dus', label: 'Dus / Karton' },
@@ -26,14 +28,16 @@ const SATUAN_GROSIR_OPTIONS = [
 ];
 
 export default function OwnerStockAdjustmentPage() {
+  const { user } = useAuthStore();
   const [logList, setLogList] = useState([]);
+  const [produkList, setProdukList] = useState([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     produkNama: '',
     tipe: 'tambah',
-    unitMode: 'grosir', // 'eceran' | 'grosir'
+    unitMode: 'grosir',
     satuanGrosir: 'Dus',
     jumlahKemasan: 0,
     isiPerKemasan: 40,
@@ -41,29 +45,47 @@ export default function OwnerStockAdjustmentPage() {
     alasan: '',
   });
 
+  useEffect(() => {
+    api.get('/owner/produk').then(res => {
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setProdukList(data);
+    }).catch(() => {});
+
+    api.get('/owner/stock-adjustment').then(res => {
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setLogList(data);
+    }).catch(() => {});
+  }, []);
+
   const totalCalculatedPcs = formData.unitMode === 'grosir'
     ? (Number(formData.jumlahKemasan) || 0) * (Number(formData.isiPerKemasan) || 1)
     : Number(formData.jumlahPcs) || 0;
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    const finalQty = totalCalculatedPcs;
     const descInfo = formData.unitMode === 'grosir'
       ? `${formData.alasan} (${formData.jumlahKemasan} ${formData.satuanGrosir} @${formData.isiPerKemasan} pcs)`
       : formData.alasan;
 
-    const newAdj = {
-      id: 'adj-' + Date.now(),
-      tanggal: 'Hari ini, ' + new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      produkNama: formData.produkNama,
-      tipe: formData.tipe,
-      jumlah: finalQty,
-      alasan: descInfo,
-      operator: 'Owner (Khamdan)',
-    };
+    try {
+      const selectedProduk = produkList.find(p => p.nama?.toLowerCase() === formData.produkNama?.toLowerCase());
+      if (!selectedProduk) return alert('Produk tidak ditemukan. Pilih dari daftar.');
 
-    setLogList(prev => [newAdj, ...prev]);
-    setIsModalOpen(false);
+      await api.post('/owner/stock-adjustment', {
+        produk_id: selectedProduk.id,
+        tipe: formData.tipe,
+        qty: totalCalculatedPcs,
+        alasan: descInfo,
+      });
+
+      setIsModalOpen(false);
+      // Refresh log
+      const res = await api.get('/owner/stock-adjustment');
+      const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(data)) setLogList(data);
+    } catch (err) {
+      alert('Gagal: ' + (err?.message || 'Terjadi kesalahan'));
+    }
   };
 
   const filteredLogs = logList.filter(l =>
@@ -147,12 +169,20 @@ export default function OwnerStockAdjustmentPage() {
         size="md"
       >
         <form onSubmit={handleSave} className="space-y-3.5 text-xs">
-          <Input
-            label="Pilih Produk"
-            value={formData.produkNama}
-            onChange={e => setFormData({ ...formData, produkNama: e.target.value })}
-            required
-          />
+          <div className="space-y-1">
+            <label className="font-semibold text-gray-700 block">Pilih Produk</label>
+            <select
+              value={formData.produkNama}
+              onChange={e => setFormData({ ...formData, produkNama: e.target.value })}
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs"
+              required
+            >
+              <option value="">Pilih Produk...</option>
+              {produkList.map(p => (
+                <option key={p.id} value={p.nama}>{p.nama} (Stok: {p.stok})</option>
+              ))}
+            </select>
+          </div>
 
           <div className="space-y-1">
             <label className="font-semibold text-gray-700 block">Tipe Penyesuaian</label>
