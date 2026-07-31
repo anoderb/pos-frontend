@@ -291,24 +291,40 @@ export default function OwnerProdukPage() {
 
   const getHargaEcer = (p) => {
     if (!p) return 0;
-    const sj = p.produk_satuan_jual?.[0] || p.satuan_jual?.[0] || {};
-    return Number(
-      p.harga_jual_default ??
-      p.harga_ecer ??
-      sj.harga_ecer ??
-      p.harga_jual ??
-      0
-    );
+    const sjList = Array.isArray(p.produk_satuan_jual) && p.produk_satuan_jual.length > 0
+      ? p.produk_satuan_jual
+      : (Array.isArray(p.satuan_jual) && p.satuan_jual.length > 0 ? p.satuan_jual : []);
+    
+    const defaultSj = sjList.find(s => s.is_default && Number(s.harga_ecer || 0) > 0) 
+      || sjList.find(s => Number(s.harga_ecer || 0) > 0) 
+      || sjList[0] 
+      || {};
+
+    const priceCandidates = [
+      defaultSj.harga_ecer,
+      p.harga_jual_default,
+      p.harga_ecer,
+      p.harga_jual,
+    ];
+
+    const validPrice = priceCandidates.map(Number).find(val => val > 0);
+    return validPrice || 0;
   };
 
   const getHargaGrosir = (p) => {
     if (!p) return 0;
-    const sj = p.produk_satuan_jual?.[0] || p.satuan_jual?.[0] || {};
-    return Number(
-      p.harga_grosir ??
-      sj.harga_grosir ??
-      0
-    );
+    const sjList = Array.isArray(p.produk_satuan_jual) && p.produk_satuan_jual.length > 0
+      ? p.produk_satuan_jual
+      : (Array.isArray(p.satuan_jual) && p.satuan_jual.length > 0 ? p.satuan_jual : []);
+
+    const defaultSj = sjList.find(s => Number(s.harga_grosir || 0) > 0) || sjList[0] || {};
+    const priceCandidates = [
+      defaultSj.harga_grosir,
+      p.harga_grosir,
+    ];
+
+    const validPrice = priceCandidates.map(Number).find(val => val > 0);
+    return validPrice || 0;
   };
 
   const handleOpenEdit = (p) => {
