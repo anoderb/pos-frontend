@@ -226,26 +226,54 @@ export default function OwnerPengaturanPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleStatusKasir(kasir)}
-                      className={cn(
-                        'px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all',
-                        isAktif ? 'bg-emerald-50 text-[#16A34A] border-emerald-200' : 'bg-gray-200 text-gray-600 border-gray-300'
-                      )}
-                    >
-                      {isAktif ? 'Aktif ✓' : 'Nonaktif'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete({ isOpen: true, id: kasir.id, nama: kasir.nama })}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Hapus Akun Kasir Permanen"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleStatusKasir(kasir)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all',
+                          isAktif ? 'bg-emerald-50 text-[#16A34A] border-emerald-200' : 'bg-gray-200 text-gray-600 border-gray-300'
+                        )}
+                      >
+                        {isAktif ? 'Aktif ✓' : 'Nonaktif'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const passBaru = prompt(`Masukkan password baru untuk kasir "${kasir.nama}" (minimal 6 karakter):`);
+                          if (!passBaru) return;
+                          if (passBaru.length < 6) return alert('Password minimal 6 karakter!');
+                          try {
+                            await api.put(`/owner/pengguna/${kasir.id}`, { password: passBaru });
+                            setFeedback({
+                              isOpen: true,
+                              type: 'success',
+                              title: 'Password Kasir Diperbarui!',
+                              message: `Password akun kasir "${kasir.nama}" telah berhasil diubah.`,
+                            });
+                          } catch (err) {
+                            setFeedback({
+                              isOpen: true,
+                              type: 'error',
+                              title: 'Gagal Ubah Password',
+                              message: err.response?.data?.pesan || err.message,
+                            });
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        title="Ubah Password Akun Kasir"
+                      >
+                        <Key className="w-4 h-4 text-amber-500" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete({ isOpen: true, id: kasir.id, nama: kasir.nama })}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Hapus Akun Kasir Permanen"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
                 </div>
               );
             })
@@ -318,7 +346,7 @@ export default function OwnerPengaturanPage() {
         title="Tambah Akun Kasir Staf Baru"
         size="md"
       >
-        <form onSubmit={handleAddKasir} className="space-y-3.5 text-xs">
+        <form onSubmit={handleCreateKasir} className="space-y-3.5 text-xs">
           <Input
             label="Nama Lengkap Staf Kasir"
             placeholder="Budi Santoso"
