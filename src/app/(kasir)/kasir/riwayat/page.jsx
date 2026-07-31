@@ -24,12 +24,9 @@ export default function KasirRiwayatPage() {
   const fetchRiwayat = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/transaksi');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        setRiwayat(res.data);
-      } else {
-        setRiwayat([]);
-      }
+      const res = await api.get('/kasir/transaksi');
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setRiwayat(data);
     } catch {
       setRiwayat([]);
     } finally {

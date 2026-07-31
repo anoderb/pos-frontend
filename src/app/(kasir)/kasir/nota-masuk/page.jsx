@@ -23,12 +23,9 @@ export default function KasirNotaMasukPage() {
   const fetchNota = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/nota-masuk');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        setNotaList(res.data);
-      } else {
-        setNotaList([]);
-      }
+      const res = await api.get('/kasir/nota-masuk');
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setNotaList(data);
     } catch {
       setNotaList([]);
     } finally {

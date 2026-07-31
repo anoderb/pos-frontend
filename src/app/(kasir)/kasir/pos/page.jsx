@@ -65,7 +65,7 @@ export default function KasirPosPage() {
   const [showReceipt, setShowReceipt] = useState(false);
 
   // Payment
-  const [metodeBayar, setMetodeBayar] = useState('tunai');
+  const [metodeBayar, setMetodeBayar] = useState('cash');
   const [uangDiterima, setUangDiterima] = useState('');
   const [completedTx, setCompletedTx] = useState(null);
 
@@ -1349,7 +1349,7 @@ export default function KasirPosPage() {
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Metode Pembayaran</p>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'tunai', label: 'Tunai', icon: Banknote },
+                { id: 'cash', label: 'Tunai', icon: Banknote },
                 { id: 'qris', label: 'QRIS', icon: QrCode },
                 { id: 'transfer', label: 'Transfer Bank', icon: Building2 },
               ].map(m => {

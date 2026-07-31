@@ -40,12 +40,9 @@ export default function KasirPelangganPage() {
   const fetchPelanggan = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/pelanggan');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        setPelangganList(res.data);
-      } else {
-        setPelangganList([]);
-      }
+      const res = await api.get('/kasir/pelanggan');
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setPelangganList(data);
     } catch {
       setPelangganList([]);
     } finally {
@@ -80,10 +77,10 @@ export default function KasirPelangganPage() {
     try {
       setIsSubmitting(true);
       if (editingId) {
-        await api.put(`/pelanggan/${editingId}`, formData);
+        await api.put(`/kasir/pelanggan/${editingId}`, formData);
         setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Data pelanggan berhasil diperbarui.' });
       } else {
-        await api.post('/pelanggan', formData);
+        await api.post('/kasir/pelanggan', formData);
         setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Pelanggan baru berhasil ditambahkan.' });
       }
       setIsFormOpen(false);

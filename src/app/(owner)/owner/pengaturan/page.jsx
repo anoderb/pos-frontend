@@ -52,12 +52,9 @@ export default function OwnerPengaturanPage() {
   const fetchKasirList = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/pengguna');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        setStafList(res.data.filter(u => u.role === 'kasir'));
-      } else {
-        setStafList([]);
-      }
+      const res = await api.get('/owner/pengguna');
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      setStafList(data.filter(u => u.role === 'kasir'));
     } catch {
       setStafList([]);
     } finally {
@@ -65,9 +62,19 @@ export default function OwnerPengaturanPage() {
     }
   };
 
-  const handleSaveToko = (e) => {
+  const handleSaveToko = async (e) => {
     e.preventDefault();
-    setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Profil Toko berhasil diperbarui!' });
+    try {
+      await api.put('/owner/toko', {
+        nama: tokoData.nama,
+        alamat: tokoData.alamat,
+        no_telp: tokoData.noHp,
+        footer_struk: tokoData.footerStruk,
+      });
+      setFeedback({ isOpen: true, type: 'success', title: 'Berhasil!', message: 'Profil Toko berhasil diperbarui!' });
+    } catch (err) {
+      setFeedback({ isOpen: true, type: 'error', title: 'Gagal Memperbarui Toko', message: err.message });
+    }
   };
 
   const handleCreateKasir = async (e) => {
@@ -76,7 +83,7 @@ export default function OwnerPengaturanPage() {
 
     try {
       setIsSubmitting(true);
-      await api.post('/pengguna/kasir', kasirForm);
+      await api.post('/owner/pengguna/kasir', kasirForm);
       setFeedback({
         isOpen: true,
         type: 'success',
@@ -102,7 +109,7 @@ export default function OwnerPengaturanPage() {
     const kasir = confirmToggle.kasir;
     try {
       const nextStatus = !kasir.aktif;
-      await api.put(`/pengguna/${kasir.id}`, { aktif: nextStatus });
+      await api.put(`/owner/pengguna/${kasir.id}`, { aktif: nextStatus });
       setFeedback({
         isOpen: true,
         type: 'info',
@@ -119,7 +126,7 @@ export default function OwnerPengaturanPage() {
   const executeDeleteKasir = async () => {
     if (!confirmDelete.id) return;
     try {
-      await api.delete(`/pengguna/${confirmDelete.id}/permanen`);
+      await api.delete(`/owner/pengguna/${confirmDelete.id}/permanen`);
       setFeedback({
         isOpen: true,
         type: 'success',
