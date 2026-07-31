@@ -24,7 +24,7 @@ export const useAdminAuthStore = create((set, get) => ({
         });
 
         // Verify profile against backend API
-        api.get('/admin/auth/profil', {
+        api.get('/admin/auth/me', {
           headers: { Authorization: `Bearer ${savedToken}` }
         })
         .then((res) => {
