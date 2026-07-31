@@ -85,12 +85,28 @@ export default function KasirPosPage() {
   const [modelError, setModelError] = useState(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
 
+  // Active Shift State (DEEP-03)
+  const [shift, setShift] = useState(null);
+
+  const { user } = useAuthStore();
+
   useEffect(() => {
     setMounted(true);
     fetchProduk();
     fetchPelanggan();
     fetchActiveModel();
+    fetchShift();
   }, []);
+
+  const fetchShift = async () => {
+    try {
+      const res = await api.get('/kasir/shift/aktif');
+      const data = res?.data || res;
+      if (data && data.id) setShift(data);
+    } catch {
+      setShift(null);
+    }
+  };
 
   const fetchActiveModel = async () => {
     setIsModelLoading(true);
@@ -108,36 +124,38 @@ export default function KasirPosPage() {
         const cacheKey = `indexeddb://tokiva-model-${model.id || model.versi || 'v1'}`;
         let loadedModel = null;
         try {
-          loadedModel = await tf.loadGraphModel(cacheKey);
-        } catch (cacheErr) {
-          // 2. Fallback: Download from network and cache into IndexedDB
-          loadedModel = await tf.loadGraphModel(model.model_json_url);
-          try {
-            await loadedModel.save(cacheKey);
-          } catch (saveErr) {
-            console.warn('Gagal menyimpan cache model ke IndexedDB:', saveErr);
+          loadedModel = await tf.loadLayersModel(cacheKey);
+          console.log('⚡ Model AI berhasil dimuat dari IndexedDB local cache!');
+        } catch {
+          // 2. Download from remote Supabase bucket
+          if (model.model_file_url) {
+            console.log('📥 Mengunduh model AI dari Supabase Storage:', model.model_file_url);
+            loadedModel = await tf.loadLayersModel(model.model_file_url);
+            // Save to IndexedDB cache
+            try {
+              await loadedModel.save(cacheKey);
+              console.log('💾 Model AI berhasil disimpan ke IndexedDB cache!');
+            } catch (saveErr) {
+              console.warn('Gagal menyimpan model ke IndexedDB cache:', saveErr);
+            }
           }
         }
 
-        setTfModel(loadedModel);
+        if (loadedModel) {
+          setTfModel(loadedModel);
+        }
 
-        // Load class labels list from class.json
-        const classUrl = model.model_json_url.replace('model.json', 'class.json');
-        try {
-          const classRes = await fetch(classUrl);
-          if (classRes.ok) {
-            const labelsData = await classRes.json();
-            let labels = [];
-            if (Array.isArray(labelsData)) {
-              labels = labelsData.map(s => String(s).toLowerCase());
-            } else if (typeof labelsData === 'object') {
-              const keys = Object.keys(labelsData);
-              labels = keys.sort((a, b) => Number(a) - Number(b)).map(k => String(labelsData[k]).toLowerCase());
+        // Fetch class labels from class.json if available
+        if (model.classes_file_url) {
+          try {
+            const resp = await fetch(model.classes_file_url);
+            const classesJson = await resp.json();
+            if (Array.isArray(classesJson)) {
+              setClassLabels(classesJson);
             }
-            setClassLabels(labels);
+          } catch (e) {
+            console.warn('Gagal memuat label kelas dari class.json:', e);
           }
-        } catch (e) {
-          console.warn('Gagal memuat label kelas dari class.json:', e);
         }
       } else {
         setModelError(res?.pesan || 'Model AI aktif tidak ditemukan.');
@@ -152,9 +170,10 @@ export default function KasirPosPage() {
 
   const fetchProduk = async () => {
     try {
-      const res = await api.get('/produk');
-      if (res?.berhasil && Array.isArray(res.data)) {
-        const normalized = res.data.map(p => ({
+      const res = await api.get('/kasir/produk');
+      const data = Array.isArray(res) ? res : (res?.data || []);
+      if (data.length > 0) {
+        const normalized = data.map(p => ({
           ...p,
           harga: Number(p.produk_satuan_jual?.[0]?.harga_ecer || p.hpp || 0),
         }));
@@ -606,23 +625,27 @@ export default function KasirPosPage() {
 
     try {
       const payload = {
+        shift_id: shift?.id || undefined,
         subtotal: subtotal,
         total: total,
         pelanggan_id: selectedCustomer?.id !== 'umum' ? selectedCustomer?.id : null,
-        metode_bayar: metodeBayar === 'tunai' ? 'cash' : metodeBayar,
+        metode_bayar: metodeBayar === 'tunai' ? 'tunai' : metodeBayar,
         nominal_bayar: metodeBayar === 'tunai' ? uangNum : total,
         diskon_total: diskon,
         items: cart.map(item => ({
           produk_id: item.id,
+          produk_satuan_jual_id: item.produk_satuan_jual?.[0]?.id || null,
           nama_produk: item.nama,
           satuan: item.satuan_dasar?.nama || 'Pcs',
+          konversi: item.produk_satuan_jual?.[0]?.konversi || 1,
           qty: item.qty,
           harga_satuan: item.harga,
+          diskon: 0,
           subtotal: item.harga * item.qty,
         })),
       };
 
-      const res = await api.post('/transaksi', payload);
+      const res = await api.post('/kasir/transaksi', payload);
       const data = res?.data || {};
 
       const tx = {
@@ -740,7 +763,7 @@ export default function KasirPosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-900 font-[family-name:var(--font-poppins)]">
-            Halo, Budi 👋
+            Halo, {user?.nama || 'Kasir'} 👋
           </h1>
           <p className="text-xs text-gray-400" suppressHydrationWarning>
             Shift aktif • {mounted ? new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '18:43'} WIB

@@ -15,8 +15,10 @@ import {
 import { cn, formatRupiah } from '@/lib/utils';
 
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 export default function KasirHomePage() {
+  const { user } = useAuthStore();
   const [mounted, setMounted] = React.useState(false);
   const [shift, setShift] = useState(null);
   const [recentTx, setRecentTx] = useState([]);
@@ -69,7 +71,7 @@ export default function KasirHomePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-900 font-[family-name:var(--font-poppins)]">
-            Halo, Budi 👋
+            Halo, {user?.nama || 'Kasir'} 👋
           </h1>
           <p className="text-xs text-gray-400" suppressHydrationWarning>
             Shift aktif • {mounted ? new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '18:43'} WIB
