@@ -83,6 +83,7 @@ export default function KasirPosPage() {
   const [modelMapping, setModelMapping] = useState([]);
   const [tfModel, setTfModel] = useState(null);
   const [modelError, setModelError] = useState(null);
+  const [isModelLoading, setIsModelLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -92,6 +93,8 @@ export default function KasirPosPage() {
   }, []);
 
   const fetchActiveModel = async () => {
+    setIsModelLoading(true);
+    setModelError(null);
     try {
       const res = await api.get('/ai/active-model');
       if (res?.berhasil && res.data) {
@@ -112,7 +115,7 @@ export default function KasirPosPage() {
           try {
             await loadedModel.save(cacheKey);
           } catch (saveErr) {
-            console.warn('Gagal menyimpan cache model:', saveErr);
+            console.warn('Gagal menyimpan cache model ke IndexedDB:', saveErr);
           }
         }
 
@@ -136,10 +139,14 @@ export default function KasirPosPage() {
         } catch (e) {
           console.warn('Gagal memuat label kelas dari class.json:', e);
         }
+      } else {
+        setModelError(res?.pesan || 'Model AI aktif tidak ditemukan.');
       }
     } catch (err) {
       console.warn('Gagal memuat model AI aktif:', err.message);
-      setModelError(err.message);
+      setModelError(err.message || 'Terjadi kesalahan saat mengunduh model AI.');
+    } finally {
+      setIsModelLoading(false);
     }
   };
 
@@ -413,6 +420,9 @@ export default function KasirPosPage() {
     setShowAiScan(true);
     setDetectedProduk(null);
     setIsDetecting(false);
+    if (!tfModel && !isModelLoading) {
+      fetchActiveModel();
+    }
   };
 
   const handleCaptureSnapshot = async () => {
@@ -867,12 +877,14 @@ export default function KasirPosPage() {
           <div className="relative z-20 flex-1 flex flex-col items-center justify-center p-4">
             {/* Floating Detection Status Pill */}
             <div className="mb-4 px-4 py-1.5 bg-black/60 backdrop-blur border border-white/10 rounded-full text-white text-xs font-semibold flex items-center gap-2 shadow-md">
-              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : !tfModel ? 'bg-amber-400' : 'bg-emerald-400')} />
+              <span className={cn('w-2 h-2 rounded-full animate-ping', showBarcodeScan ? 'bg-red-400' : isModelLoading ? 'bg-amber-400' : modelError || !tfModel ? 'bg-rose-400' : 'bg-emerald-400')} />
               <span>
                 {showBarcodeScan
                   ? 'Mendeteksi barcode...'
-                  : !tfModel
-                  ? 'Memuat Model AI ke Browser...'
+                  : isModelLoading
+                  ? 'Mengunduh & Memuat Model AI...'
+                  : modelError || !tfModel
+                  ? 'Gagal Memuat Model AI'
                   : detectedProduk
                   ? `Sukses! ${detectedProduk.nama} Terdeteksi`
                   : 'Memindai AI Real-Time (Otomatis)...'}
@@ -892,13 +904,41 @@ export default function KasirPosPage() {
                 <div className="absolute left-4 right-4 h-0.5 bg-red-500 shadow-lg shadow-red-500/80 animate-pulse top-1/2 -translate-y-1/2" />
               )}
 
-              {/* AI Model Loading State */}
+              {/* AI Model Loading & Error States */}
               {showAiScan && !tfModel && (
-                <div className="bg-black/70 backdrop-blur px-5 py-4 rounded-2xl border border-white/10 text-center animate-fade-in">
-                  <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-xs text-emerald-300 font-bold">Memuat Model AI...</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Menyiapkan cache IndexedDB browser</p>
-                </div>
+                isModelLoading ? (
+                  <div className="bg-black/80 backdrop-blur px-5 py-4 rounded-2xl border border-white/10 text-center animate-fade-in max-w-[240px]">
+                    <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <p className="text-xs text-emerald-300 font-bold">Memuat Model AI...</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Menyiapkan cache IndexedDB browser</p>
+                  </div>
+                ) : (
+                  <div className="bg-black/85 backdrop-blur p-4 rounded-2xl border border-rose-500/30 text-center animate-fade-in max-w-[260px] space-y-2.5">
+                    <div className="w-9 h-9 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto">
+                      <X className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-rose-300">Gagal Memuat Model AI</p>
+                      <p className="text-[10px] text-gray-300 leading-tight mt-0.5 max-h-12 overflow-y-auto">
+                        {modelError || 'Tidak dapat terhubung ke server model.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <button
+                        onClick={() => fetchActiveModel()}
+                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-black text-[11px] font-bold rounded-xl transition-colors shadow-sm"
+                      >
+                        Coba Lagi
+                      </button>
+                      <button
+                        onClick={() => { setShowAiScan(false); setShowBarcodeScan(true); }}
+                        className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold rounded-xl border border-white/10 transition-colors"
+                      >
+                        Mode Barcode
+                      </button>
+                    </div>
+                  </div>
+                )
               )}
 
               {/* AI Manual Processing Spinner */}

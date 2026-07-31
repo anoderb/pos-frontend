@@ -42,7 +42,22 @@ export default function useTfjsModel() {
     setError(null);
     try {
       await tf.ready();
-      const loaded = await tf.loadGraphModel(modelUrl);
+      
+      const cleanKey = modelUrl.replace(/[^a-zA-Z0-9]/g, '-').slice(-30);
+      const cacheKey = `indexeddb://tokiva-admin-model-${cleanKey}`;
+      let loaded = null;
+
+      try {
+        loaded = await tf.loadGraphModel(cacheKey);
+      } catch {
+        loaded = await tf.loadGraphModel(modelUrl);
+        try {
+          await loaded.save(cacheKey);
+        } catch (saveErr) {
+          console.warn('Gagal menyimpan cache model admin ke IndexedDB:', saveErr);
+        }
+      }
+
       modelRef.current = loaded;
       setModel(loaded);
 
@@ -60,7 +75,7 @@ export default function useTfjsModel() {
       } catch { /* class.json optional */ }
     } catch (err) {
       console.error('Model load failed:', err);
-      setError(err.message);
+      setError(err.message || 'Gagal memuat berkas model AI.');
       modelRef.current = null;
       setModel(null);
     } finally {
