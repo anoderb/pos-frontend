@@ -9,28 +9,45 @@ export const api = axios.create({
   },
 });
 
-// Auto Inject JWT Token if available in localStorage
+// Auto Inject JWT Token if available in localStorage (isolated by path context)
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('tokiva_admin_token') || localStorage.getItem('tokiva_jwt_token');
-    if (token) {
+    const isAdminPath = window.location.pathname.startsWith('/admin');
+    const token = isAdminPath
+      ? localStorage.getItem('tokiva_admin_token')
+      : localStorage.getItem('tokiva_jwt_token');
+
+    if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
   return config;
 });
 
-
 // Safe Response Interceptor (Auto Clear Stale Session on 401 Unauthorized)
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (typeof window !== 'undefined' && error.response?.status === 401) {
-      localStorage.removeItem('tokiva_jwt_token');
-      localStorage.removeItem('tokiva_user_profile');
-      localStorage.removeItem('tokiva_toko_profile');
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
+      const reqUrl = error.config?.url || '';
+      
+      // Ignore login endpoint 401 errors so login form shows error message instead of reloading
+      if (!reqUrl.includes('/login')) {
+        const isAdminPath = window.location.pathname.startsWith('/admin');
+        if (isAdminPath) {
+          localStorage.removeItem('tokiva_admin_token');
+          localStorage.removeItem('tokiva_admin_profile');
+          if (!window.location.pathname.startsWith('/admin/login')) {
+            window.location.href = '/admin/login';
+          }
+        } else {
+          localStorage.removeItem('tokiva_jwt_token');
+          localStorage.removeItem('tokiva_user_profile');
+          localStorage.removeItem('tokiva_toko_profile');
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
+        }
       }
     }
     const errorMsg =
