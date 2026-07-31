@@ -1,13 +1,6 @@
 import { create } from 'zustand';
 import { api } from '@/lib/api';
 
-export const DEMO_MASTER_ADMIN = {
-  id: 'demo-master-admin-id',
-  nama: 'Master Admin Tokiva (Demo)',
-  email: 'admin.demo@tokiva.biz.id',
-  role: 'master_admin',
-};
-
 export const useAdminAuthStore = create((set, get) => ({
   admin: null,
   token: null,
@@ -31,20 +24,18 @@ export const useAdminAuthStore = create((set, get) => ({
         });
 
         // Verify profile against backend API
-        if (!savedToken.startsWith('demo-admin-token-')) {
-          api.get('/admin/auth/profil', {
-            headers: { Authorization: `Bearer ${savedToken}` }
-          })
-          .then((res) => {
-            if (res.berhasil && res.data) {
-              localStorage.setItem('tokiva_admin_profile', JSON.stringify(res.data));
-              set({ admin: res.data });
-            }
-          })
-          .catch(() => {
-            get().logoutAdmin();
-          });
-        }
+        api.get('/admin/auth/profil', {
+          headers: { Authorization: `Bearer ${savedToken}` }
+        })
+        .then((res) => {
+          if (res.berhasil && res.data) {
+            localStorage.setItem('tokiva_admin_profile', JSON.stringify(res.data));
+            set({ admin: res.data });
+          }
+        })
+        .catch(() => {
+          get().logoutAdmin();
+        });
       } catch (err) {
         get().logoutAdmin();
       }
@@ -78,20 +69,6 @@ export const useAdminAuthStore = create((set, get) => ({
       set({ isLoading: false });
       return { success: false, message: err.message || 'Terjadi kesalahan saat login Admin' };
     }
-  },
-
-  // Login Demo Mode for Testing
-  loginDemoAdmin: () => {
-    const demoToken = 'demo-admin-token-super';
-    localStorage.setItem('tokiva_admin_token', demoToken);
-    localStorage.setItem('tokiva_admin_profile', JSON.stringify(DEMO_MASTER_ADMIN));
-
-    set({
-      admin: DEMO_MASTER_ADMIN,
-      token: demoToken,
-      isInitialized: true,
-      isLoading: false,
-    });
   },
 
   // Logout Admin

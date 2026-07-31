@@ -26,11 +26,6 @@ export default function AdminLoginPage() {
     }
   };
 
-  const handleDemoLogin = () => {
-    loginDemoAdmin();
-    router.push('/admin/dashboard');
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 select-none">
       {/* Background Decor */}
@@ -113,17 +108,6 @@ export default function AdminLoginPage() {
             )}
           </button>
         </form>
-
-        {/* Demo Fast Login */}
-        <div className="mt-6 pt-6 border-t border-slate-800 text-center">
-          <button
-            onClick={handleDemoLogin}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 text-emerald-400 hover:text-emerald-300 text-xs font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Masuk Mode Demo Admin (Instan)</span>
-          </button>
-        </div>
       </div>
     </div>
   );
