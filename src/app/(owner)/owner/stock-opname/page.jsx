@@ -55,7 +55,6 @@ export default function OwnerStockOpnamePage() {
           stokFisik: item.stok_fisik !== null ? Number(item.stok_fisik) : Number(item.stok_sistem || 0),
           selisih: Number(item.selisih || 0),
           nilaiSelisih: Number(item.nilai_selisih || 0),
-          hargaEcer: Number(item.harga_satuan || 0),
         })));
       }
     } catch {}
@@ -92,7 +91,7 @@ export default function OwnerStockOpnamePage() {
   };
 
   const totalSelisihUnit = items.reduce((acc, item) => acc + (item.stokFisik - item.stokSistem), 0);
-  const totalNilaiSelisih = items.reduce((acc, item) => acc + ((item.stokFisik - item.stokSistem) * (item.hargaEcer || 0)), 0);
+  const totalNilaiSelisih = items.reduce((acc, item) => acc + (item.nilaiSelisih || 0), 0);
 
   // 3️⃣ Finalize
   const handleFinalApprove = async () => {
@@ -220,7 +219,7 @@ export default function OwnerStockOpnamePage() {
 
             <div className="pt-2 flex justify-end">
               <button
-                onClick={() => setTahap(3)}
+                onClick={handleSimpanFisik}
                 className="flex items-center gap-1 px-4 py-2 bg-[#16A34A] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#15803D]"
               >
                 Lanjut ke Review Approval
@@ -256,7 +255,7 @@ export default function OwnerStockOpnamePage() {
                 <div key={item.id} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded-lg">
                   <span className="font-semibold text-gray-800">{item.nama}</span>
                   <span className="font-bold text-[#EF4444]">
-                    {item.stokFisik - item.stokSistem} pcs ({formatRupiah((item.stokFisik - item.stokSistem) * item.hargaEcer)})
+                    {item.stokFisik - item.stokSistem} pcs ({formatRupiah(item.nilaiSelisih)})
                   </span>
                 </div>
               ))}

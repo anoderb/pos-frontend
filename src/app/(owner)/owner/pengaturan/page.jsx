@@ -31,7 +31,7 @@ export default function OwnerPengaturanPage() {
   const [tokoData, setTokoData] = useState({
     nama: toko?.nama || 'Toko Tokiva',
     alamat: toko?.alamat || '',
-    noHp: toko?.no_hp || '',
+    noHp: toko?.no_telp || '',
     footerStruk: toko?.footer_struk || 'Terima kasih telah berbelanja!',
   });
 
@@ -305,7 +305,7 @@ export default function OwnerPengaturanPage() {
 
             try {
               const res = await api.post('/auth/reset-password', {
-                email: useAuthStore.getState().pengguna?.email || 'anoderb@gmail.com',
+                email: useAuthStore.getState().user?.email || '',
                 new_password: passBaru,
               });
               setFeedback({ isOpen: true, type: 'success', title: 'Password Diperbarui!', message: res?.pesan || 'Password akun Anda berhasil diperbarui!' });

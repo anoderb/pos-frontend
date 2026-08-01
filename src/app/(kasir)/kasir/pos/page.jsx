@@ -30,6 +30,8 @@ import * as tf from '@tensorflow/tfjs';
 import { cn, formatRupiah } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { syncService } from '@/services/syncService';
+import { db } from '@/lib/db';
 
 /* ─────────── Reusable Product Thumbnail ─────────── */
 function ProdukThumb({ nama, img, className }) {
@@ -106,6 +108,13 @@ export default function KasirPosPage() {
     fetchPelanggan();
     fetchActiveModel();
     fetchShift();
+  }, []);
+
+  // Auto-sync offline transactions every 30 seconds
+  useEffect(() => {
+    syncService.syncOfflineTransactions();
+    const interval = setInterval(() => syncService.syncOfflineTransactions(), 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchShift = async () => {
@@ -689,6 +698,32 @@ export default function KasirPosPage() {
       setShowReceipt(true);
       fetchProduk();
     } catch (err) {
+      // Save to offline queue if network error
+      if (!err.response) {
+        try {
+          const nomor = `TRX-OFF-${Date.now().toString(36)}`;
+          await db.transaksi_offline.put({
+            id: nomor,
+            nomor_transaksi: nomor,
+            ...payload,
+            status_sync: 'pending',
+            created_at: new Date().toISOString(),
+          });
+          setCompletedTx({
+            nomor_transaksi: nomor,
+            total,
+            uang_diterima: metodeBayar === 'cash' ? uangNum : total,
+            kembalian: metodeBayar === 'cash' ? kembalian : 0,
+            offline: true,
+          });
+          setShowPayment(false);
+          setShowReceipt(true);
+          setCart([]);
+          return;
+        } catch (dexErr) {
+          console.error('Gagal simpan offline:', dexErr);
+        }
+      }
       alert('Gagal memproses transaksi: ' + (err.response?.data?.pesan || err.message));
     }
   };
