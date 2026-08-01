@@ -7,7 +7,7 @@ import { useAdminAuthStore } from '@/store/adminAuthStore';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { loginAdmin, loginDemoAdmin, isLoading } = useAdminAuthStore();
+  const { loginAdmin, isLoading } = useAdminAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
