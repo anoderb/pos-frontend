@@ -164,9 +164,9 @@ export default function KasirPosPage() {
           console.log('⚡ Model AI berhasil dimuat dari IndexedDB local cache!');
         } catch {
           // 2. Download from remote Supabase bucket
-          if (model.model_file_url) {
-            console.log('📥 Mengunduh model AI dari Supabase Storage:', model.model_file_url);
-            loadedModel = await tf.loadLayersModel(model.model_file_url);
+          if (model.model_json_url) {
+            console.log('📥 Mengunduh model AI dari Supabase Storage:', model.model_json_url);
+            loadedModel = await tf.loadLayersModel(model.model_json_url);
             // Save to IndexedDB cache
             try {
               await loadedModel.save(cacheKey);
