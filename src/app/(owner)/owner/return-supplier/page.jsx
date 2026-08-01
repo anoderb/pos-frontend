@@ -104,24 +104,15 @@ export default function OwnerReturnSupplierPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold text-gray-900">{item.nomorRetur}</h4>
-                    <span
-                      className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0',
-                        isSelesai ? 'bg-emerald-50 text-[#16A34A]' : 'bg-amber-50 text-amber-700'
-                      )}
-                    >
-                      {item.status}
-                    </span>
+                    <h4 className="text-xs font-bold text-gray-900">{item.nomor_return}</h4>
                   </div>
-
-                  <p className="text-xs font-semibold text-gray-800 mt-1 truncate">{item.supplier}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">{item.produk} • {item.qty} pcs</p>
+                  <p className="text-xs font-semibold text-gray-800 mt-1 truncate">{item.supplier?.nama || '-'}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{item.items?.[0]?.nama_produk || '-'} • {item.items?.[0]?.qty || 0} pcs</p>
                 </div>
 
                 <div className="text-right shrink-0">
-                  <p className="text-xs font-extrabold text-[#16A34A]">{formatRupiah(item.totalNilai)}</p>
-                  <span className="text-[10px] text-gray-400 font-medium block mt-1">{item.tanggal}</span>
+                  <p className="text-xs font-extrabold text-[#16A34A]">{formatRupiah(item.total)}</p>
+                  <span className="text-[10px] text-gray-400 font-medium block mt-1">{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
                 </div>
               </div>
             );
