@@ -380,9 +380,26 @@ export default function KasirPosPage() {
   const isCooldownRef = useRef(false);
 
   const getProductByClassSlug = (slug) => {
+    if (!slug) return null;
+    const s = slug.toLowerCase().replace(/-/g, ' ');
+    
+    // 1. Try barcode mapping
     const mapping = modelMapping.find(m => m.class_slug?.toLowerCase() === slug?.toLowerCase());
-    if (!mapping) return null;
-    return produkList.find(p => p.barcode === mapping.barcode);
+    if (mapping) {
+      const byBarcode = produkList.find(p => p.barcode === mapping.barcode);
+      if (byBarcode) return byBarcode;
+    }
+    
+    // 2. Fallback: match by product name (slug words)
+    const byName = produkList.find(p => {
+      const pname = (p.nama || '').toLowerCase();
+      const words = s.split(' ');
+      return words.some(w => w.length > 2 && pname.includes(w));
+    });
+    if (byName) return byName;
+    
+    // 3. Fallback: any product (so AI at least detects something)
+    return null;
   };
 
   // 🔄 REAL-TIME AI CONTINUOUS INFERENCE LOOP (Every 350ms)
