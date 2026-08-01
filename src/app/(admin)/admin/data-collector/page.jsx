@@ -192,6 +192,17 @@ export default function AdminDataCollectorPage() {
     }
   };
 
+  const handleDeleteUnmapped = async (prod) => {
+    if (!confirm('Hapus produk "' + prod.nama + '" dari daftar?')) return;
+    try {
+      const token = getToken();
+      await api.delete('/admin/dataset/unmapped/' + prod.id, { headers: { Authorization: 'Bearer ' + token } });
+      fetchUnmapped();
+    } catch (err) {
+      alert('Gagal menghapus: ' + (err.response?.data?.pesan || err.message));
+    }
+  };
+
   // Filtered & Paginated Classes
   const filteredClasses = classes.filter((c) =>
     c.nama?.toLowerCase().includes(searchTerm.toLowerCase()) || c.barcode?.includes(searchTerm)
@@ -392,10 +403,16 @@ export default function AdminDataCollectorPage() {
                           <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-bold">UNMAPPED</span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button onClick={() => handleOpenMapModal(p)}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 ml-auto shadow-lg shadow-emerald-500/20">
-                            <LinkIcon className="w-3.5 h-3.5" /> Petakan ke Class
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => handleOpenMapModal(p)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+                              <LinkIcon className="w-3.5 h-3.5" /> Petakan
+                            </button>
+                            <button onClick={() => handleDeleteUnmapped(p)}
+                              className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition-all" title="Hapus Produk">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
