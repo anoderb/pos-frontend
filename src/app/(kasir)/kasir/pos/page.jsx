@@ -148,7 +148,7 @@ export default function KasirPosPage() {
     setIsModelLoading(true);
     setModelError(null);
     try {
-      const res = await api.get('/ai/active-model');
+      const res = await api.get('/kasir/ai/active-model');
       if (res?.berhasil && res.data) {
         const { model, mappings } = res.data;
         setModelInfo(model);
