@@ -152,8 +152,8 @@ export default function KasirHomePage() {
             <Link key={tx.id} href={`/kasir/riwayat/${tx.id}`}>
               <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50/50 transition-colors">
                 <div>
-                  <p className="text-xs font-semibold text-gray-900 font-mono">{tx.nomor}</p>
-                  <p className="text-[10px] text-gray-400">{tx.waktu} • {tx.metode.toUpperCase()}</p>
+                  <p className="text-xs font-semibold text-gray-900 font-mono">{tx.nomor_transaksi}</p>
+                  <p className="text-[10px] text-gray-400">{new Date(tx.created_at).toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'})} • {tx.metode_bayar?.toUpperCase?.() || 'CASH'}</p>
                 </div>
                 <div className="text-right">
                   <p className={cn('text-xs font-bold', tx.status === 'void' ? 'text-[#EF4444] line-through' : 'text-[#16A34A]')}>
