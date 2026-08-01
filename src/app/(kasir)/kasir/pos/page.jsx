@@ -1234,7 +1234,7 @@ export default function KasirPosPage() {
               </div>
               <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white">
                 {aiCandidates.slice(0, 3).map((cand, idx) => (
-                  <React.Fragment key={cand.id || idx}>
+                  <React.Fragment key={cand.slug || cand.nama || idx}>
                     {idx > 0 && <span className="text-gray-600 font-light mx-1">|</span>}
                     <button
                       onClick={() => handleSelectCandidate(cand)}
