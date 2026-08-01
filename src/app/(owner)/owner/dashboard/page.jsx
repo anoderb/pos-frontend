@@ -43,13 +43,13 @@ export default function OwnerDashboardPage() {
       const dash = dashRes?.data || dashRes || {};
 
       setStats({
-        omset: Number(dash.omzet_hari_ini || dash.omset || 0),
-        labaBersih: Number(dash.estimasi_laba || dash.laba_bersih || 0),
-        totalTx: Number(dash.total_transaksi_hari_ini || dash.totalTx || 0),
+        omset: Number(dash.omzet_hari_ini || 0),
+        labaBersih: Number(dash.estimasi_laba || 0),
+        totalTx: Number(dash.total_transaksi_hari_ini || 0),
         stokKritis: Number(dash.total_stok_kritis || 0),
       });
 
-      setTopBestSeller(Array.isArray(dash.stok_kritis_list) ? dash.stok_kritis_list : (Array.isArray(dash.top_best_seller) ? dash.top_best_seller : []));
+      setTopBestSeller(Array.isArray(dash.stok_kritis_list) ? dash.stok_kritis_list : []);
     } catch {
       setStats({ omset: 0, labaBersih: 0, totalTx: 0, stokKritis: 0 });
       setTopBestSeller([]);
@@ -211,32 +211,43 @@ export default function OwnerDashboardPage() {
         </div>
       </div>
 
-      {/* Top Best Seller List */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-3">
+      {/* Stok Kritis Alert */}
+      <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Top Produk Terlaris</h3>
-          <Link href="/owner/laporan" className="text-xs font-semibold text-[#16A34A] hover:underline flex items-center gap-0.5">
-            Lihat Laporan Full
+          <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Stok Kritis — Perlu Restok
+          </h3>
+          <Link href="/owner/produk" className="text-xs font-semibold text-[#16A34A] hover:underline flex items-center gap-0.5">
+            Kelola Produk
             <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="space-y-2.5">
-          {topBestSeller.map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <span className={cn('w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center text-white', i === 0 ? 'bg-[#16A34A]' : 'bg-gray-400')}>
-                  {i + 1}
-                </span>
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900">{item.nama}</h4>
-                  <p className="text-[10px] text-gray-400">{item.terjual} pcs terjual</p>
+        {topBestSeller.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-3">Semua stok aman terkendali 🎉</p>
+        ) : (
+          <div className="space-y-2.5">
+            {topBestSeller.map((item, i) => (
+              <div key={item.id} className="flex items-center justify-between p-2.5 bg-red-50/50 rounded-xl border border-red-100">
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-lg bg-red-500 font-bold text-xs flex items-center justify-center text-white">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-900">{item.nama}</h4>
+                    <p className="text-[10px] text-red-500 font-semibold">
+                      Stok: {item.stok} / Min: {item.stok_minimum}
+                    </p>
+                  </div>
                 </div>
+                <span className="text-xs font-bold text-red-600">
+                  -{item.stok_minimum - item.stok}
+                </span>
               </div>
-              <p className="text-xs font-bold text-[#16A34A]">{formatRupiah(item.totalOmset)}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

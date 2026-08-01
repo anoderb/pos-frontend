@@ -89,8 +89,8 @@ export default function OwnerStockAdjustmentPage() {
   };
 
   const filteredLogs = logList.filter(l =>
-    l.produkNama.toLowerCase().includes(search.toLowerCase()) ||
-    l.alasan.toLowerCase().includes(search.toLowerCase())
+    (l.produk?.nama || '').toLowerCase().includes(search.toLowerCase()) ||
+    (l.alasan || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -143,9 +143,9 @@ export default function OwnerStockAdjustmentPage() {
               </div>
 
               <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-bold text-gray-900 truncate">{item.produkNama}</h4>
+                <h4 className="text-xs font-bold text-gray-900 truncate">{item.produk?.nama || '-'}</h4>
                 <p className="text-[11px] text-gray-500 mt-0.5">{item.alasan}</p>
-                <p className="text-[10px] text-gray-400 mt-1">{item.tanggal} • {item.operator}</p>
+                <p className="text-[10px] text-gray-400 mt-1">{new Date(item.created_at).toLocaleDateString('id-ID')} • {item.pembuat?.nama || '-'}</p>
               </div>
 
               <div className="text-right shrink-0">
@@ -153,7 +153,7 @@ export default function OwnerStockAdjustmentPage() {
                   'text-sm font-extrabold px-2.5 py-1 rounded-xl border',
                   isTambah ? 'bg-emerald-50 text-[#16A34A] border-emerald-200' : 'bg-red-50 text-[#EF4444] border-red-200'
                 )}>
-                  {isTambah ? `+${item.jumlah}` : `-${item.jumlah}`} pcs
+                  {isTambah ? `+${item.qty}` : `-${item.qty}`} pcs
                 </span>
               </div>
             </div>

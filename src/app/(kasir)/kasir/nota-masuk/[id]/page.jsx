@@ -24,7 +24,7 @@ export default function KasirDetailNotaMasukPage({ params }) {
   const fetchDetail = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get(`/nota-masuk/${id}`);
+      const res = await api.get(`/kasir/nota-masuk/${id}`);
       if (res?.berhasil && res.data) {
         setDetail(res.data);
       } else {

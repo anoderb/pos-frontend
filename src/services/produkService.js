@@ -5,7 +5,7 @@ export const produkService = {
   // Sync masif data produk dari API server ke Dexie.js
   async syncProdukFromServer() {
     try {
-      const res = await api.get('/produk');
+      const res = await api.get('/kasir/produk');
       if (res.berhasil && res.data) {
         await db.produk.bulkPut(res.data);
       }

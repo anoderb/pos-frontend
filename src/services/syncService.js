@@ -14,7 +14,7 @@ export const syncService = {
     if (pendingTx.length === 0) return;
 
     try {
-      const res = await api.post('/transaksi/sync-offline', { transaksi: pendingTx });
+      const res = await api.post('/kasir/transaksi/sync-offline', { transaksi: pendingTx });
       if (res.berhasil) {
         const ids = pendingTx.map((t) => t.id);
         await db.transaksi_offline.bulkDelete(ids);

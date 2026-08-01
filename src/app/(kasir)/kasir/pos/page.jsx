@@ -29,9 +29,17 @@ import {
 import * as tf from '@tensorflow/tfjs';
 import { cn, formatRupiah } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 /* ─────────── Reusable Product Thumbnail ─────────── */
-function ProdukThumb({ nama, className }) {
+function ProdukThumb({ nama, img, className }) {
+  if (img) {
+    return (
+      <div className={cn('overflow-hidden rounded-xl border border-gray-200 shrink-0 bg-gray-100', className)}>
+        <img src={img} alt={nama} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
   const initials = (nama || 'P').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   return (
     <div className={cn('bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center text-[#16A34A] font-bold text-xs select-none', className)}>
@@ -87,6 +95,8 @@ export default function KasirPosPage() {
 
   // Active Shift State (DEEP-03)
   const [shift, setShift] = useState(null);
+  const [isShiftLoading, setIsShiftLoading] = useState(true);
+  const [modalAwal, setModalAwal] = useState('');
 
   const { user } = useAuthStore();
 
@@ -100,11 +110,28 @@ export default function KasirPosPage() {
 
   const fetchShift = async () => {
     try {
+      setIsShiftLoading(true);
       const res = await api.get('/kasir/shift/aktif');
       const data = res?.data || res;
       if (data && data.id) setShift(data);
+      else setShift(null);
     } catch {
       setShift(null);
+    } finally {
+      setIsShiftLoading(false);
+    }
+  };
+
+  const handleBukaShift = async () => {
+    try {
+      const res = await api.post('/kasir/shift/buka', { modal_awal: Number(modalAwal) || 0 });
+      const data = res?.data || res;
+      if (data && data.id) {
+        setShift(data);
+        setModalAwal('');
+      }
+    } catch (err) {
+      alert('Gagal buka shift: ' + (err?.message || 'Coba lagi'));
     }
   };
 
@@ -621,7 +648,7 @@ export default function KasirPosPage() {
 
   /* ── Checkout ── */
   const handleBayar = async () => {
-    if (metodeBayar === 'tunai' && uangNum < total) return;
+    if (metodeBayar === 'cash' && uangNum < total) return;
 
     try {
       const payload = {
@@ -629,8 +656,8 @@ export default function KasirPosPage() {
         subtotal: subtotal,
         total: total,
         pelanggan_id: selectedCustomer?.id !== 'umum' ? selectedCustomer?.id : null,
-        metode_bayar: metodeBayar === 'tunai' ? 'tunai' : metodeBayar,
-        nominal_bayar: metodeBayar === 'tunai' ? uangNum : total,
+        metode_bayar: metodeBayar,
+        nominal_bayar: metodeBayar === 'cash' ? uangNum : total,
         diskon_total: diskon,
         items: cart.map(item => ({
           produk_id: item.id,
@@ -653,8 +680,8 @@ export default function KasirPosPage() {
         tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
         waktu: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
         total,
-        uang_diterima: metodeBayar === 'tunai' ? uangNum : total,
-        kembalian: metodeBayar === 'tunai' ? kembalian : 0,
+        uang_diterima: metodeBayar === 'cash' ? uangNum : total,
+        kembalian: metodeBayar === 'cash' ? kembalian : 0,
       };
 
       setCompletedTx(tx);
@@ -670,7 +697,7 @@ export default function KasirPosPage() {
     setCart([]);
     setDiskon(0);
     setUangDiterima('');
-    setMetodeBayar('tunai');
+    setMetodeBayar('cash');
     setSelectedCustomer(pelangganList[0] || { id: 'umum', nama: 'Pelanggan Umum', no_hp: '' });
     setShowReceipt(false);
     setView('home');
@@ -699,7 +726,7 @@ export default function KasirPosPage() {
         <div className="space-y-3 py-3">
           {cart.map((item, idx) => (
             <div key={item.id || `cart-item-${idx}`} className="flex items-center gap-3 bg-white rounded-2xl p-3 border border-gray-100 shadow-xs">
-              <ProdukThumb nama={item.nama} className="w-14 h-14 rounded-xl shrink-0 text-xs" />
+              <ProdukThumb nama={item.nama} img={item.foto_url} className="w-14 h-14 rounded-xl shrink-0 text-xs" />
               <div className="flex-1 min-w-0">
                 <h4 className="text-xs font-bold text-gray-900 truncate">{item.nama}</h4>
                 <p className="text-[11px] text-gray-400">{item.qty} x {formatRupiah(item.harga)}</p>
@@ -757,6 +784,48 @@ export default function KasirPosPage() {
   /* ════════════════════════════════════════════════════
      SCREEN 1: HALAMAN KASIR (AWAL) — HOME VIEW
      ════════════════════════════════════════════════════ */
+
+  // Shift Guard — wajib buka shift sebelum POS
+  if (isShiftLoading) {
+    return (
+      <div className="max-w-md mx-auto flex items-center justify-center min-h-screen">
+        <p className="text-sm text-gray-400">Memeriksa shift...</p>
+      </div>
+    );
+  }
+
+  if (!shift) {
+    return (
+      <div className="max-w-md mx-auto flex flex-col items-center justify-center min-h-screen px-6 text-center space-y-5">
+        <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <Banknote className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Buka Shift Dulu</h2>
+          <p className="text-xs text-gray-400 mt-1">Shift harus aktif sebelum transaksi.</p>
+        </div>
+        <div className="w-full max-w-xs space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 block mb-1">Modal Awal (Rp)</label>
+            <input
+              type="number"
+              value={modalAwal}
+              onChange={e => setModalAwal(e.target.value)}
+              placeholder="0"
+              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-center focus:outline-none focus:border-[#16A34A]"
+            />
+          </div>
+          <button
+            onClick={handleBukaShift}
+            className="w-full py-3 bg-[#16A34A] text-white font-bold rounded-xl hover:bg-[#15803D] transition-all active:scale-[0.98]"
+          >
+            Buka Shift
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto space-y-5">
       {/* ── Header Greeting ── */}
@@ -828,7 +897,7 @@ export default function KasirPosPage() {
               onClick={() => addToCart(p)}
               className="shrink-0 w-28 bg-white border border-gray-100 rounded-2xl p-2.5 shadow-xs hover:border-[#16A34A] transition-all active:scale-[0.97]"
             >
-              <ProdukThumb nama={p.nama} className="w-full h-16 rounded-lg mb-2 text-sm" />
+              <ProdukThumb nama={p.nama} img={p.foto_url} className="w-full h-16 rounded-lg mb-2 text-sm" />
               <h4 className="text-[11px] font-semibold text-gray-900 truncate">{p.nama}</h4>
               <p className="text-[11px] font-bold text-[#16A34A] mt-0.5">{formatRupiah(p.harga)}</p>
             </button>
@@ -852,7 +921,7 @@ export default function KasirPosPage() {
             {cart.map((item, idx) => (
               <div key={item.id || `mini-cart-${idx}`} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0">
                 <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                  <ProdukThumb nama={item.nama} className="w-8 h-8 rounded-lg shrink-0 text-[9px]" />
+                  <ProdukThumb nama={item.nama} img={item.foto_url} className="w-8 h-8 rounded-lg shrink-0 text-[9px]" />
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-xs text-gray-900 truncate" title={item.nama}>{item.nama}</p>
                     <p className="text-gray-400 text-[11px]">{item.qty} x {formatRupiah(item.harga)}</p>
@@ -1217,7 +1286,7 @@ export default function KasirPosPage() {
                   onClick={() => handleSelectCandidate(cand)}
                   className="w-full flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-2xl hover:border-[#16A34A] transition-all active:scale-[0.98]"
                 >
-                  <ProdukThumb nama={cand.nama} className="w-14 h-14 rounded-xl shrink-0 text-sm" />
+                  <ProdukThumb nama={cand.nama} img={cand.foto_url} className="w-14 h-14 rounded-xl shrink-0 text-sm" />
                   <div className="flex-1 text-left">
                     <div className="flex items-center gap-2">
                       <span className={cn(
@@ -1373,7 +1442,7 @@ export default function KasirPosPage() {
           </div>
 
           {/* Uang Diterima & Quick Chips (Tunai only) */}
-          {metodeBayar === 'tunai' && (
+          {metodeBayar === 'cash' && (
             <div className="space-y-3 mb-4">
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-1 block">Uang Diterima</label>
@@ -1420,7 +1489,7 @@ export default function KasirPosPage() {
           {/* CTA Bayar */}
           <button
             onClick={handleBayar}
-            disabled={metodeBayar === 'tunai' && uangNum < total}
+            disabled={metodeBayar === 'cash' && uangNum < total}
             className="w-full flex items-center justify-center gap-2 bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold py-3.5 rounded-2xl transition-all disabled:opacity-50 shadow-sm"
           >
             Bayar Sekarang

@@ -28,7 +28,7 @@ export default function KasirDetailRiwayatPage({ params }) {
   const fetchDetail = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get(`/transaksi/${id}`);
+      const res = await api.get(`/kasir/transaksi/${id}`);
       if (res?.berhasil && res.data) {
         setDetail(res.data);
       } else {
@@ -48,7 +48,7 @@ export default function KasirDetailRiwayatPage({ params }) {
     }
     try {
       setIsVoiding(true);
-      await api.post(`/transaksi/${id}/void`, { alasan_void: alasanVoid });
+      await api.post(`/kasir/transaksi/${id}/void`, { alasan_void: alasanVoid });
       alert('Transaksi berhasil di-void!');
       setIsVoidModalOpen(false);
       fetchDetail();

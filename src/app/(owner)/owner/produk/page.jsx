@@ -8,10 +8,6 @@ import {
   Edit,
   Trash2,
   AlertTriangle,
-  Tag,
-  CheckCircle2,
-  Barcode,
-  Layers,
   Camera,
   ScanBarcode,
   X,
@@ -56,16 +52,6 @@ const SATUAN_ECERAN_OPTIONS = [
   { value: 'biji', label: 'biji (Biji / Unit)' },
 ];
 
-const SATUAN_GROSIR_OPTIONS = [
-  { value: 'Dus', label: 'Dus / Karton' },
-  { value: 'Bal', label: 'Bal / Karung Plastik' },
-  { value: 'Slop', label: 'Slop / Press' },
-  { value: 'Renceng', label: 'Renceng / Gantung' },
-  { value: 'Karung', label: 'Karung 25kg/50kg' },
-  { value: 'Pak', label: 'Pak / Box Kecil' },
-  { value: 'Kranji', label: 'Kranji / Keranjang' },
-];
-
 export default function OwnerProdukPage() {
   const [produkList, setProdukList] = useState([]);
   const [search, setSearch] = useState('');
@@ -80,7 +66,7 @@ export default function OwnerProdukPage() {
     api.get('/owner/satuan').then(res => {
       const data = res?.berhasil ? res.data : (Array.isArray(res?.data) ? res.data : []);
       if (Array.isArray(data) && data.length > 0) {
-        setSatuanOptions(data.map(s => ({ value: s.kode || s.nama, label: `${s.kode || s.nama} (${s.nama})` })));
+        setSatuanOptions(data.map(s => ({ value: s.id, label: `${s.nama}` })));
       }
     }).catch(() => {});
   }, []);
@@ -120,40 +106,13 @@ export default function OwnerProdukPage() {
   const [formData, setFormData] = useState({
     nama: '',
     barcode: '',
-    kategori: 'Makanan',
     stok: 0,
     stok_minimum: 10,
     satuan: 'pcs',
-    satuan_grosir: 'Dus',
-    isi_per_grosir: 40,
-    harga_modal_grosir: '',
-    margin_target: 20,
-    harga_ecer: '',
-    harga_grosir: '',
-    min_qty_grosir: 5,
+    hpp: '',
+    harga_jual: '',
     fotos: [],
   });
-
-  const calcHppPerUnit = () => {
-    const modal = Number(formData.harga_modal_grosir) || 0;
-    const isi = Number(formData.isi_per_grosir) || 1;
-    if (modal > 0 && isi > 0) return Math.round(modal / isi);
-    return 0;
-  };
-
-  const applyCalculatedPrices = (marginPercent) => {
-    const hpp = calcHppPerUnit();
-    if (hpp > 0) {
-      const suggestedEcer = Math.ceil((hpp * (1 + marginPercent / 100)) / 100) * 100;
-      const suggestedGrosir = Math.ceil((hpp * (1 + (marginPercent - 8) / 100)) / 100) * 100;
-      setFormData(prev => ({
-        ...prev,
-        harga_ecer: suggestedEcer,
-        harga_grosir: Math.max(suggestedGrosir, hpp),
-        margin_target: marginPercent,
-      }));
-    }
-  };
 
   // Camera lifecycle for snapshot photo capture
   useEffect(() => {
@@ -271,86 +230,23 @@ export default function OwnerProdukPage() {
   const handleOpenAdd = () => {
     setEditingId(null);
     setFormData({
-      nama: '',
-      barcode: '',
-      kategori: 'Makanan',
-      stok: 50,
-      stok_minimum: 10,
-      satuan: 'pcs',
-      satuan_grosir: 'Dus',
-      isi_per_grosir: 40,
-      harga_modal_grosir: '',
-      margin_target: 20,
-      harga_ecer: '',
-      harga_grosir: '',
-      min_qty_grosir: 5,
-      fotos: [],
+      nama: '', barcode: '', stok: 0, stok_minimum: 10,
+      satuan: 'pcs', hpp: '', harga_jual: '', fotos: [],
     });
     setIsFormOpen(true);
   };
 
-  const getHargaEcer = (p) => {
-    if (!p) return 0;
-    const sjList = Array.isArray(p.produk_satuan_jual) && p.produk_satuan_jual.length > 0
-      ? p.produk_satuan_jual
-      : (Array.isArray(p.satuan_jual) && p.satuan_jual.length > 0 ? p.satuan_jual : []);
-    
-    const defaultSj = sjList.find(s => s.is_default && Number(s.harga_ecer || 0) > 0) 
-      || sjList.find(s => Number(s.harga_ecer || 0) > 0) 
-      || sjList[0] 
-      || {};
-
-    const priceCandidates = [
-      defaultSj.harga_ecer,
-      p.harga_jual_default,
-      p.harga_ecer,
-      p.harga_jual,
-    ];
-
-    const validPrice = priceCandidates.map(Number).find(val => val > 0);
-    return validPrice || 0;
-  };
-
-  const getHargaGrosir = (p) => {
-    if (!p) return 0;
-    const sjList = Array.isArray(p.produk_satuan_jual) && p.produk_satuan_jual.length > 0
-      ? p.produk_satuan_jual
-      : (Array.isArray(p.satuan_jual) && p.satuan_jual.length > 0 ? p.satuan_jual : []);
-
-    const defaultSj = sjList.find(s => Number(s.harga_grosir || 0) > 0) || sjList[0] || {};
-    const priceCandidates = [
-      defaultSj.harga_grosir,
-      p.harga_grosir,
-    ];
-
-    const validPrice = priceCandidates.map(Number).find(val => val > 0);
-    return validPrice || 0;
-  };
-
   const handleOpenEdit = (p) => {
     setEditingId(p.id);
-    const sj = p.produk_satuan_jual?.[0] || p.satuan_jual?.[0] || {};
-    const ecerVal = getHargaEcer(p);
-    const grosirVal = getHargaGrosir(p);
-    const hppVal = Number(p.hpp || 0);
-    const isiGrosir = Number(p.isi_per_grosir || 40);
-    const modalGrosir = p.harga_modal_grosir || (hppVal > 0 ? hppVal * isiGrosir : '');
-
     setFormData({
       nama: p.nama || '',
       barcode: p.barcode || '',
-      kategori: p.kategori || 'Makanan',
       stok: p.stok ?? 0,
       stok_minimum: p.stok_minimum ?? 10,
-      satuan: p.satuan_dasar?.nama || p.satuan || 'pcs',
-      satuan_grosir: p.satuan_grosir || 'Dus',
-      isi_per_grosir: isiGrosir,
-      harga_modal_grosir: modalGrosir,
-      margin_target: 20,
-      harga_ecer: ecerVal > 0 ? ecerVal : '',
-      harga_grosir: grosirVal > 0 ? grosirVal : '',
-      min_qty_grosir: sj.min_qty_grosir || p.min_qty_grosir || 5,
-      fotos: p.fotos || (p.img ? [p.img] : []),
+      satuan: p.satuan_dasar?.nama || 'pcs',
+      hpp: p.hpp > 0 ? p.hpp : '',
+      harga_jual: Number(p.harga_jual_default || 0) || '',
+      fotos: p.foto_url ? [p.foto_url] : (p.fotos || (p.img ? [p.img] : [])),
     });
     setIsFormOpen(true);
   };
@@ -370,8 +266,9 @@ export default function OwnerProdukPage() {
         barcode: formData.barcode,
         stok: Number(formData.stok) || 0,
         stok_minimum: Number(formData.stok_minimum) || 0,
-        harga_jual_default: Number(formData.harga_ecer) || 0,
-        hpp: Math.round(Number(formData.harga_modal_grosir) / (Number(formData.isi_per_grosir) || 1)) || 0,
+        hpp: Number(formData.hpp) || 0,
+        harga_jual_default: Number(formData.harga_jual) || 0,
+        satuan_id: formData.satuan || null,
         foto_url: formData.fotos?.[0] || null,
       };
 
@@ -457,9 +354,9 @@ export default function OwnerProdukPage() {
         <>
           <div className="space-y-2.5">
             {filteredProduk.slice((page - 1) * 20, page * 20).map((p) => {
-              const ecerPrice = getHargaEcer(p);
-              const grosirPrice = getHargaGrosir(p);
-              const minQty = p.produk_satuan_jual?.[0]?.min_qty_grosir || p.satuan_jual?.[0]?.min_qty_grosir || 5;
+              const ecerPrice = Number(p.harga_jual_default || 0);
+              const grosirPrice = Number(p.harga_grosir || 0);
+              const minQty = Number(p.min_qty_grosir) || 5;
               const isKritis = p.stok <= p.stok_minimum;
 
               return (
@@ -470,7 +367,7 @@ export default function OwnerProdukPage() {
                     isKritis ? 'border-red-200 bg-red-50/20' : 'border-gray-100'
                   )}
                 >
-                  <ProdukThumb nama={p.nama} img={p.img || p.fotos?.[0]} className="w-12 h-12 rounded-xl text-xs font-bold" />
+                  <ProdukThumb nama={p.nama} img={p.foto_url || p.img || p.fotos?.[0]} className="w-12 h-12 rounded-xl text-xs font-bold" />
 
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate">{p.nama}</h4>
@@ -668,111 +565,36 @@ export default function OwnerProdukPage() {
                 className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-[#16A34A] font-semibold"
                 required
               >
-                {SATUAN_ECERAN_OPTIONS.map(opt => (
+                {(satuanOptions.length > 0 ? satuanOptions : SATUAN_ECERAN_OPTIONS).map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Konfigurasi Satuan Grosir & Rasio Isi Kustom */}
-          <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2.5">
-            <p className="font-bold text-blue-900 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-blue-600" />
-              Kemasan Grosir & Rasio Isi (Beli per Dus/Slop/Bal/Karung)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="font-semibold text-gray-700 block">Satuan Grosir</label>
-                <select
-                  value={formData.satuan_grosir}
-                  onChange={e => setFormData({ ...formData, satuan_grosir: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:border-blue-500 font-semibold"
-                >
-                  {SATUAN_GROSIR_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <Input
-                label={`Isi per ${formData.satuan_grosir} (${formData.satuan})`}
-                type="number"
-                value={formData.isi_per_grosir}
-                onChange={e => setFormData({ ...formData, isi_per_grosir: e.target.value })}
-                placeholder="40"
-              />
-            </div>
-          </div>
-
-          {/* SMART KALKULATOR HPP & REKOMENDASI HARGA PROPOSED MARGIN */}
-          <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200/80 space-y-3 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/60 pb-2.5">
-              <div className="flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 text-[#16A34A]">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <h4 className="font-extrabold text-[#16A34A] text-xs tracking-tight font-[family-name:var(--font-poppins)]">
-                  Kalkulator HPP & Rekomendasi Harga Jual
-                </h4>
-              </div>
-              {calcHppPerUnit() > 0 && (
-                <span className="inline-flex items-center px-3 py-1 bg-[#16A34A] text-white rounded-full text-[11px] font-bold shadow-xs whitespace-nowrap self-start sm:self-auto">
-                  HPP: {formatRupiah(calcHppPerUnit())} / {formData.satuan}
-                </span>
-              )}
-            </div>
-
-            <Input
-              label={`Harga Modal Beli per 1 ${formData.satuan_grosir}`}
-              type="number"
-              prefix="Rp"
-              placeholder="Contoh: 110000"
-              value={formData.harga_modal_grosir}
-              onChange={e => setFormData({ ...formData, harga_modal_grosir: e.target.value })}
-            />
-
-            {calcHppPerUnit() > 0 && (
-              <div className="space-y-2.5 pt-2">
-                <p className="text-[11px] font-bold text-gray-700">Pilih Target Margin Untung (Sistem Auto-Rekomendasi):</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[10, 15, 20, 25].map((margin) => {
-                    const hpp = calcHppPerUnit();
-                    const ecer = Math.ceil((hpp * (1 + margin / 100)) / 100) * 100;
-                    const isSelected = formData.margin_target === margin;
-
-                    return (
-                      <button
-                        type="button"
-                        key={margin}
-                        onClick={() => applyCalculatedPrices(margin)}
-                        className={cn(
-                          'p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center',
-                          isSelected
-                            ? 'bg-[#16A34A] text-white border-[#16A34A] shadow-md font-bold'
-                            : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-100/50 hover:border-emerald-300'
-                        )}
-                      >
-                        <span className={cn('text-[10px] uppercase font-semibold tracking-wider', isSelected ? 'text-white/90' : 'text-gray-500')}>
-                          {margin}% Margin
-                        </span>
-                        <span className="text-xs font-extrabold mt-0.5">{formatRupiah(ecer)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="bg-white rounded-xl p-3 border border-emerald-200 text-xs flex items-center justify-between text-gray-700 shadow-2xs">
-                  <span className="font-semibold text-gray-600">Proyeksi Laba / 1 {formData.satuan_grosir}:</span>
-                  <span className="font-extrabold text-[#16A34A] text-sm">
-                    +{formatRupiah(((Number(formData.harga_ecer) || 0) - calcHppPerUnit()) * (Number(formData.isi_per_grosir) || 1))}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Stok Awal Saat Ini"
+              label="Harga Beli / HPP (satuan)"
+              type="number"
+              prefix="Rp"
+              value={formData.hpp}
+              onChange={e => setFormData({ ...formData, hpp: e.target.value })}
+              placeholder="3500"
+            />
+            <Input
+              label="Harga Jual Eceran"
+              type="number"
+              prefix="Rp"
+              value={formData.harga_jual}
+              onChange={e => setFormData({ ...formData, harga_jual: e.target.value })}
+              required
+              placeholder="5000"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Stok Saat Ini"
               type="number"
               value={formData.stok}
               onChange={e => setFormData({ ...formData, stok: e.target.value })}
@@ -784,36 +606,6 @@ export default function OwnerProdukPage() {
               value={formData.stok_minimum}
               onChange={e => setFormData({ ...formData, stok_minimum: e.target.value })}
               required
-            />
-          </div>
-
-          <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 space-y-3">
-            <p className="font-bold text-[#16A34A] flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5" />
-              Skema Multi-Harga (Tiering)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Harga Eceran (Satuan)"
-                type="number"
-                prefix="Rp"
-                value={formData.harga_ecer}
-                onChange={e => setFormData({ ...formData, harga_ecer: e.target.value })}
-                required
-              />
-              <Input
-                label="Harga Grosir"
-                type="number"
-                prefix="Rp"
-                value={formData.harga_grosir}
-                onChange={e => setFormData({ ...formData, harga_grosir: e.target.value })}
-              />
-            </div>
-            <Input
-              label="Min Qty Pembelian Grosir"
-              type="number"
-              value={formData.min_qty_grosir}
-              onChange={e => setFormData({ ...formData, min_qty_grosir: e.target.value })}
             />
           </div>
 
