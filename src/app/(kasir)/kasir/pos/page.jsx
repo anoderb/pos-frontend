@@ -160,16 +160,16 @@ export default function KasirPosPage() {
         const cacheKey = `indexeddb://tokiva-model-${model.id || model.versi || 'v1'}`;
         let loadedModel = null;
         try {
-          loadedModel = await tf.loadLayersModel(cacheKey);
+          loadedModel = await tf.loadGraphModel(cacheKey + "-graph");
           console.log('⚡ Model AI berhasil dimuat dari IndexedDB local cache!');
         } catch {
           // 2. Download from remote Supabase bucket
           if (model.model_json_url) {
             console.log('📥 Mengunduh model AI dari Supabase Storage:', model.model_json_url);
-            loadedModel = await tf.loadLayersModel(model.model_json_url);
+            loadedModel = await tf.loadGraphModel(model.model_json_url);
             // Save to IndexedDB cache
             try {
-              await loadedModel.save(cacheKey);
+              await loadedModel.save(cacheKey + '-graph');
               console.log('💾 Model AI berhasil disimpan ke IndexedDB cache!');
             } catch (saveErr) {
               console.warn('Gagal menyimpan model ke IndexedDB cache:', saveErr);
