@@ -181,17 +181,20 @@ export default function KasirPosPage() {
           setTfModel(loadedModel);
         }
 
-        // Fetch class labels from class.json if available
-        if (model.classes_file_url) {
-          try {
-            const resp = await fetch(model.classes_file_url);
-            const classesJson = await resp.json();
-            if (Array.isArray(classesJson)) {
-              setClassLabels(classesJson);
-            }
-          } catch (e) {
-            console.warn('Gagal memuat label kelas dari class.json:', e);
+        // Fetch class labels from class.json (derived from model_json_url path)
+        try {
+          const modelDir = model.model_json_url.replace(/\/model\.json$/, '');
+          const resp = await fetch(modelDir + '/class.json');
+          const classesJson = await resp.json();
+          const labels = Array.isArray(classesJson)
+            ? classesJson
+            : Object.keys(classesJson).sort((a,b) => Number(a)-Number(b)).map(k => classesJson[k]);
+          if (labels.length > 0) {
+            setClassLabels(labels);
+            console.log('📋 Class labels loaded:', labels.length);
           }
+        } catch (e) {
+          console.warn('Gagal memuat class labels:', e);
         }
       } else {
         setModelError(res?.pesan || 'Model AI aktif tidak ditemukan.');
