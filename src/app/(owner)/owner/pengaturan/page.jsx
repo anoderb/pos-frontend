@@ -45,6 +45,12 @@ export default function OwnerPengaturanPage() {
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null, nama: '' });
   const [confirmToggle, setConfirmToggle] = useState({ isOpen: false, kasir: null });
 
+  // Modal Reset Password Kasir
+  const [resetKasir, setResetKasir] = useState({ isOpen: false, id: null, nama: '' });
+  const [resetPass, setResetPass] = useState('');
+  const [resetKonfirm, setResetKonfirm] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
   useEffect(() => {
     fetchKasirList();
   }, []);
@@ -239,26 +245,10 @@ export default function OwnerPengaturanPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={async () => {
-                          const passBaru = prompt(`Masukkan password baru untuk kasir "${kasir.nama}" (minimal 6 karakter):`);
-                          if (!passBaru) return;
-                          if (passBaru.length < 6) return alert('Password minimal 6 karakter!');
-                          try {
-                            await api.put(`/owner/pengguna/${kasir.id}`, { password: passBaru });
-                            setFeedback({
-                              isOpen: true,
-                              type: 'success',
-                              title: 'Password Kasir Diperbarui!',
-                              message: `Password akun kasir "${kasir.nama}" telah berhasil diubah.`,
-                            });
-                          } catch (err) {
-                            setFeedback({
-                              isOpen: true,
-                              type: 'error',
-                              title: 'Gagal Ubah Password',
-                              message: err.response?.data?.pesan || err.message,
-                            });
-                          }
+                        onClick={() => {
+                          setResetPass('');
+                          setResetKonfirm('');
+                          setResetKasir({ isOpen: true, id: kasir.id, nama: kasir.nama });
                         }}
                         className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                         title="Ubah Password Akun Kasir"
@@ -304,8 +294,7 @@ export default function OwnerPengaturanPage() {
             }
 
             try {
-              const res = await api.post('/auth/reset-password', {
-                email: useAuthStore.getState().user?.email || '',
+              const res = await api.post('/auth/ganti-password', {
                 new_password: passBaru,
               });
               setFeedback({ isOpen: true, type: 'success', title: 'Password Diperbarui!', message: res?.pesan || 'Password akun Anda berhasil diperbarui!' });
@@ -373,6 +362,62 @@ export default function OwnerPengaturanPage() {
 
           <Button variant="primary" fullWidth size="lg" type="submit" isLoading={isSubmitting}>
             Buat Akun Kasir Staf
+          </Button>
+        </form>
+      </Modal>
+
+      {/* Modal Reset Password Kasir */}
+      <Modal
+        isOpen={resetKasir.isOpen}
+        onClose={() => { setResetKasir({ isOpen: false, id: null, nama: '' }); setResetPass(''); setResetKonfirm(''); }}
+        title={`Reset Password ${resetKasir.nama || 'Kasir'}`}
+      >
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!resetPass || resetPass.length < 6) {
+              setFeedback({ isOpen: true, type: 'error', title: 'Validasi Gagal', message: 'Password baru minimal 6 karakter!' });
+              return;
+            }
+            if (resetPass !== resetKonfirm) {
+              setFeedback({ isOpen: true, type: 'error', title: 'Validasi Gagal', message: 'Konfirmasi password tidak cocok!' });
+              return;
+            }
+            setIsResetting(true);
+            try {
+              await api.put(`/owner/pengguna/${resetKasir.id}`, { password: resetPass });
+              setFeedback({ isOpen: true, type: 'success', title: 'Password Kasir Diperbarui!', message: `Password akun kasir "${resetKasir.nama}" telah berhasil diubah.` });
+              setResetKasir({ isOpen: false, id: null, nama: '' });
+              setResetPass('');
+              setResetKonfirm('');
+            } catch (err) {
+              setFeedback({ isOpen: true, type: 'error', title: 'Gagal Ubah Password', message: err.response?.data?.pesan || err.message });
+            } finally {
+              setIsResetting(false);
+            }
+          }}
+          className="space-y-4"
+        >
+          <p className="text-xs text-gray-500">Masukkan password baru untuk akun kasir. Password minimal <b>6 karakter</b>.</p>
+          <Input
+            label="Password Baru"
+            type="password"
+            placeholder="Minimal 6 karakter"
+            value={resetPass}
+            onChange={e => setResetPass(e.target.value)}
+            required
+          />
+          <Input
+            label="Konfirmasi Password Baru"
+            type="password"
+            placeholder="Ulangi password baru"
+            value={resetKonfirm}
+            onChange={e => setResetKonfirm(e.target.value)}
+            required
+          />
+          <Button variant="primary" fullWidth size="lg" type="submit" isLoading={isResetting}>
+            <Key className="w-4 h-4 mr-1.5" />
+            Reset Password
           </Button>
         </form>
       </Modal>
