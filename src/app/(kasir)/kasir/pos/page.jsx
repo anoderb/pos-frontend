@@ -31,6 +31,7 @@ import { cn, formatRupiah } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { syncService } from '@/services/syncService';
+import { produkService } from '@/services/produkService';
 import { db } from '@/lib/db';
 
 /* ─────────── Reusable Product Thumbnail ─────────── */
@@ -107,6 +108,16 @@ export default function KasirPosPage() {
     fetchProduk();
     fetchPelanggan();
     fetchActiveModel();
+    
+    // Offline sync interval - every 30s
+    const syncInterval = setInterval(() => {
+      syncService.syncOfflineTransactions();
+    }, 30000);
+    
+    // Auto-sync produk from server to IndexedDB on mount
+    produkService.syncProdukFromServer();
+    
+    return () => clearInterval(syncInterval);
     fetchShift();
   }, []);
 
@@ -217,11 +228,28 @@ export default function KasirPosPage() {
           harga: Number(p.produk_satuan_jual?.[0]?.harga_ecer || p.hpp || 0),
         }));
         setProdukList(normalized);
+        // Cache ke IndexedDB buat offline
+        try { await produkService.syncProdukFromServer(); } catch {}
       } else {
         setProdukList([]);
       }
     } catch {
-      setProdukList([]);
+      // Fallback: ambil dari IndexedDB cache
+      try {
+        const lokal = await produkService.getProdukLokal();
+        if (lokal.length > 0) {
+          const normalized = lokal.map(p => ({
+            ...p,
+            harga: Number(p.produk_satuan_jual?.[0]?.harga_ecer || p.hpp || 0),
+          }));
+          setProdukList(normalized);
+          console.log('📦 Offline: menggunakan data produk lokal');
+        } else {
+          setProdukList([]);
+        }
+      } catch {
+        setProdukList([]);
+      }
     }
   };
 
