@@ -108,6 +108,7 @@ export default function KasirPosPage() {
     fetchProduk();
     fetchPelanggan();
     fetchActiveModel();
+    fetchShift();
     
     // Offline sync interval - every 30s
     const syncInterval = setInterval(() => {
@@ -118,7 +119,6 @@ export default function KasirPosPage() {
     produkService.syncProdukFromServer();
     
     return () => clearInterval(syncInterval);
-    fetchShift();
   }, []);
 
   // Auto-sync offline transactions every 30 seconds
