@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Store, Mail, Lock, LogIn } from 'lucide-react';
+import { Store, Mail, Lock, LogIn, HelpCircle, X, Send } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import FeedbackModal from '@/components/ui/FeedbackModal';
+import Modal from '@/components/ui/Modal';
 import { useAuthStore } from '@/store/authStore';
+import { api } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +22,11 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const [feedback, setFeedback] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+
+  const [showLupaPassword, setShowLupaPassword] = useState(false);
+  const [lupaEmail, setLupaEmail] = useState('');
+  const [isLupaLoading, setIsLupaLoading] = useState(false);
+  const [lupaSent, setLupaSent] = useState(false);
 
   useEffect(() => {
     initAuth();
@@ -35,6 +42,20 @@ export default function LoginPage() {
       }
     }
   }, [user, token, router]);
+
+  const handleLupaPassword = async (e) => {
+    e.preventDefault();
+    if (!lupaEmail) return;
+    setIsLupaLoading(true);
+    try {
+      await api.post('/auth/lupa-password', { email: lupaEmail });
+      setLupaSent(true);
+    } catch {
+      setFeedback({ isOpen: true, type: 'error', title: 'Gagal', message: 'Gagal mengirim email reset. Coba lagi nanti.' });
+    } finally {
+      setIsLupaLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -114,6 +135,16 @@ export default function LoginPage() {
           required
         />
 
+        <div className="text-right -mt-2">
+          <button
+            type="button"
+            onClick={() => { setLupaEmail(email); setShowLupaPassword(true); }}
+            className="text-xs text-[#16A34A] hover:underline font-semibold"
+          >
+            Lupa Password?
+          </button>
+        </div>
+
         <div className="pt-2">
           <Button
             type="submit"
@@ -137,6 +168,58 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+
+      {/* Modal Lupa Password */}
+      <Modal
+        isOpen={showLupaPassword}
+        onClose={() => { setShowLupaPassword(false); setLupaSent(false); }}
+        title="Reset Password"
+        size="sm"
+      >
+        {lupaSent ? (
+          <div className="text-center py-6 space-y-3">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+              <Send className="w-6 h-6 text-[#16A34A]" />
+            </div>
+            <p className="text-sm font-bold text-gray-900">Email Terkirim!</p>
+            <p className="text-xs text-gray-500">
+              Link reset password telah dikirim ke <strong>{lupaEmail}</strong>.
+              Silakan cek kotak masuk (atau spam) email Anda.
+            </p>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => { setShowLupaPassword(false); setLupaSent(false); }}
+            >
+              Tutup
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleLupaPassword} className="space-y-4">
+            <p className="text-xs text-gray-500">
+              Masukkan email terdaftar Anda. Kami akan kirimkan link reset password.
+            </p>
+            <Input
+              label="Email"
+              type="email"
+              placeholder="email@toko.com"
+              icon={Mail}
+              value={lupaEmail}
+              onChange={(e) => setLupaEmail(e.target.value)}
+              required
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              fullWidth
+              isLoading={isLupaLoading}
+              icon={HelpCircle}
+            >
+              Kirim Link Reset
+            </Button>
+          </form>
+        )}
+      </Modal>
 
       {/* Feedback Modal Popup */}
       <FeedbackModal
