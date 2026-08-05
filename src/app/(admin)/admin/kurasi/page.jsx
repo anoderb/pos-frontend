@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/components/layout/admin/AdminLayout';
 import { api } from '@/lib/api';
-import { CheckSquare, Check, X, Store, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckSquare, Check, X, Store, ArrowRight, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
 
 export default function AdminKurasiPage() {
   const [koreksiList, setKoreksiList] = useState([]);
@@ -11,6 +11,7 @@ export default function AdminKurasiPage() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
+  const [filter, setFilter] = useState('all'); // 'all' | 'correct' | 'wrong'
   const itemsPerPage = 5;
 
   useEffect(() => {
@@ -58,8 +59,16 @@ export default function AdminKurasiPage() {
     }
   };
 
-  const totalPages = Math.ceil(koreksiList.length / itemsPerPage) || 1;
-  const currentKoreksi = koreksiList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const stats = {
+    total: koreksiList.length,
+    correct: koreksiList.filter(k => k.is_correct === true).length,
+    wrong: koreksiList.filter(k => k.is_correct === false).length,
+  };
+  const filteredList = filter === 'correct' ? koreksiList.filter(k => k.is_correct === true)
+    : filter === 'wrong' ? koreksiList.filter(k => k.is_correct === false)
+    : koreksiList;
+  const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
+  const currentKoreksi = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <AdminLayout title="Kurasi Koreksi Kasir & Unknown Products">
@@ -74,13 +83,36 @@ export default function AdminKurasiPage() {
           </p>
         </div>
 
+        {/* Stats & Filter Bar */}
+        {koreksiList.length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
+              <span className="text-slate-400">Total:</span>
+              <span className="font-bold text-slate-200">{stats.total}</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-emerald-400">AI Benar: {stats.correct}</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs">
+              <X className="w-3.5 h-3.5 text-rose-400" />
+              <span className="text-rose-400">AI Salah: {stats.wrong}</span>
+            </div>
+            <div className="flex items-center gap-1 ml-auto">
+              <button onClick={() => { setFilter('all'); setCurrentPage(1); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}>Semua</button>
+              <button onClick={() => { setFilter('correct'); setCurrentPage(1); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === 'correct' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}>AI Benar</button>
+              <button onClick={() => { setFilter('wrong'); setCurrentPage(1); }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === 'wrong' ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}>AI Salah</button>
+            </div>
+          </div>
+        )}
+
         {/* List of Pending Corrections */}
         <div className="space-y-4">
           {isLoading ? (
             <div className="py-12 text-center text-slate-500 text-xs">
               Memuat antrean koreksi kasir...
             </div>
-          ) : koreksiList.length === 0 ? (
+          ) : filteredList.length === 0 ? (
             <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto mb-2">
                 <CheckSquare className="w-6 h-6" />
@@ -126,6 +158,16 @@ export default function AdminKurasiPage() {
                       <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
                         Kasir: {item.produk_dipilih?.nama || 'Produk Dipilih'}
                       </span>
+                      {item.is_correct === true && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> AI Benar
+                        </span>
+                      )}
+                      {item.is_correct === false && (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/30 flex items-center gap-1">
+                          <X className="w-3 h-3" /> AI Salah
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 pt-1">
@@ -157,7 +199,7 @@ export default function AdminKurasiPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400">
             <span>
-              Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, koreksiList.length)} dari {koreksiList.length} Antrean
+              Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredList.length)} dari {filteredList.length} Antrean
             </span>
             <div className="flex items-center gap-2">
               <button

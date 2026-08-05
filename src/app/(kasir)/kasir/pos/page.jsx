@@ -88,6 +88,7 @@ export default function KasirPosPage() {
   const [barcodeDetectorSupported, setBarcodeDetectorSupported] = useState(null); // null=cek, true/false
   const [barcodeNotFound, setBarcodeNotFound] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
+  const [koreksiToast, setKoreksiToast] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
 
   // Video Ref for HTML5 Camera
@@ -510,6 +511,20 @@ export default function KasirPosPage() {
 
                 addToCart(matchedProduct);
 
+                // NEW: Kirim koreksi positive (AI benar) untuk continuous learning
+                const snap = lastSnapshotRef.current;
+                if (snap) {
+                  api.post('/kasir/ai/koreksi', {
+                    foto_base64: snap,
+                    prediksi_1_produk_id: matchedProduct.id,
+                    prediksi_1_confidence: topPrediction.score,
+                    produk_dipilih_id: matchedProduct.id,
+                    is_correct: true,
+                  }).catch(() => {});
+                  setKoreksiToast(true);
+                  setTimeout(() => setKoreksiToast(false), 2000);
+                }
+
                 // Auto-resume scanning for the next item after 1.2 seconds (hands-free)
                 setTimeout(() => {
                   setDetectedProduk(null);
@@ -718,8 +733,11 @@ export default function KasirPosPage() {
         prediksi_2_confidence: lastPredictionsMetadata.pred_2_conf,
         prediksi_3_produk_id: lastPredictionsMetadata.pred_3_prod_id,
         prediksi_3_confidence: lastPredictionsMetadata.pred_3_conf,
-        produk_dipilih_id: produk.id
+        produk_dipilih_id: produk.id,
+        is_correct: false,
       }).catch((e) => console.warn('Gagal menyimpan evaluasi koreksi:', e));
+      setKoreksiToast(true);
+      setTimeout(() => setKoreksiToast(false), 2000);
     }
   };
 
@@ -880,8 +898,16 @@ export default function KasirPosPage() {
         {renderCustomerSheet()}
         {renderPaymentSheet()}
         {renderReceiptModal()}
-      </div>
-    );
+
+        {/* Koreksi Feedback Toast */}
+        {koreksiToast && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-500/30 animate-fade-in flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Koreksi tersimpan! Admin akan review untuk training AI.
+          </div>
+        )}
+        </div>
+        );
   }
 
   /* ════════════════════════════════════════════════════
@@ -1472,6 +1498,14 @@ export default function KasirPosPage() {
       {renderCustomerSheet()}
       {renderPaymentSheet()}
       {renderReceiptModal()}
+
+      {/* Koreksi Feedback Toast */}
+      {koreksiToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-500/30 animate-fade-in flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          Koreksi tersimpan! Admin akan review untuk training AI.
+        </div>
+      )}
     </div>
   );
 
