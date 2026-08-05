@@ -26,6 +26,7 @@ import {
   UserPlus,
   ArrowRight,
   VideoOff,
+  Info,
 } from 'lucide-react';
 import * as tf from '@tensorflow/tfjs';
 import { cn, formatRupiah } from '@/lib/utils';
@@ -89,6 +90,7 @@ export default function KasirPosPage() {
   const [barcodeNotFound, setBarcodeNotFound] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
   const [koreksiToast, setKoreksiToast] = useState(false);
+  const [alreadyInCartToast, setAlreadyInCartToast] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
 
   // Video Ref for HTML5 Camera
@@ -331,7 +333,11 @@ export default function KasirPosPage() {
     setBarcodeNotFound(false);
     const found = produkList.find(p => p.barcode === code || p.id === code);
     if (found) {
-      addToCart(found);
+      const added = addToCart(found);
+      if (!added) {
+        setAlreadyInCartToast({ nama: found.nama });
+        setTimeout(() => setAlreadyInCartToast(null), 2500);
+      }
       setTimeout(() => {
         setShowBarcodeScan(false);
         setScannedBarcodeCode('');
@@ -377,17 +383,20 @@ export default function KasirPosPage() {
 
   /* ── Cart helpers ── */
   const addToCart = (produk) => {
-    playBeepSound();
-    if (!produk || !produk.id) return;
+    if (!produk || !produk.id) return false;
+    let added = false;
     setCart((prevCart) => {
       const idx = prevCart.findIndex(i => i.id === produk.id);
       if (idx > -1) {
-        const nextCart = [...prevCart];
-        nextCart[idx] = { ...nextCart[idx], qty: nextCart[idx].qty + 1 };
-        return nextCart;
+        // Sudah ada — jangan auto qty++, kasir manual
+        added = false;
+        return prevCart;
       }
-      return [...prevCart, { ...produk, qty: 1 }];
+      added = true;
+      playBeepSound();
+      return [{ ...produk, qty: 1 }, ...prevCart]; // prepend = terbaru di atas
     });
+    return added;
   };
 
   const updateQty = (id, delta) => {
@@ -509,7 +518,11 @@ export default function KasirPosPage() {
                 });
                 setAiCandidates([]); // Clear any previous candidates banner
 
-                addToCart(matchedProduct);
+                const added = addToCart(matchedProduct);
+                if (!added) {
+                  setAlreadyInCartToast({ nama: matchedProduct.nama });
+                  setTimeout(() => setAlreadyInCartToast(null), 2500);
+                }
 
                 // NEW: Kirim koreksi positive (AI benar) untuk continuous learning
                 const snap = lastSnapshotRef.current;
@@ -718,7 +731,11 @@ export default function KasirPosPage() {
   };
 
   const handleSelectCandidate = (produk) => {
-    addToCart(produk);
+    const added = addToCart(produk);
+    if (!added) {
+      setAlreadyInCartToast({ nama: produk.nama });
+      setTimeout(() => setAlreadyInCartToast(null), 2500);
+    }
     setAiCandidates([]);
     isCooldownRef.current = false;
     
@@ -904,6 +921,14 @@ export default function KasirPosPage() {
           <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-500/30 animate-fade-in flex items-center gap-2">
             <CheckCircle className="w-4 h-4" />
             Koreksi tersimpan! Admin akan review untuk training AI.
+          </div>
+        )}
+
+        {/* Already In Cart Toast */}
+        {alreadyInCartToast && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-amber-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-amber-500/30 animate-fade-in flex items-center gap-2">
+            <Info className="w-4 h-4" />
+            {alreadyInCartToast.nama} sudah di keranjang. Tambah qty manual.
           </div>
         )}
         </div>
@@ -1504,6 +1529,14 @@ export default function KasirPosPage() {
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-500/30 animate-fade-in flex items-center gap-2">
           <CheckCircle className="w-4 h-4" />
           Koreksi tersimpan! Admin akan review untuk training AI.
+        </div>
+      )}
+
+      {/* Already In Cart Toast */}
+      {alreadyInCartToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-amber-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-amber-500/30 animate-fade-in flex items-center gap-2">
+          <Info className="w-4 h-4" />
+          {alreadyInCartToast.nama} sudah di keranjang. Tambah qty manual.
         </div>
       )}
     </div>
