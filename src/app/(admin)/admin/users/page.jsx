@@ -31,18 +31,7 @@ export default function AdminUsersPage() {
         setTenants(res.data);
       }
     } catch (err) {
-      setTenants([
-        {
-          id: 'demo-toko-123',
-          nama: 'Toko Kelontong Berkah (Demo)',
-          alamat: 'Jl. Sukajadi No. 12, Bandung',
-          no_telepon: '081234567890',
-          created_at: new Date().toISOString(),
-          pengguna: [
-            { nama: 'Owner Demo Tokiva', email: 'owner.demo@tokiva.biz.id', role: 'owner', aktif: true }
-          ]
-        }
-      ]);
+      setTenants([]);
     } finally {
       setIsLoading(false);
     }
@@ -67,10 +56,11 @@ export default function AdminUsersPage() {
     }
   };
 
-  const filteredTenants = tenants.filter((t) =>
-    t.nama?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.pengguna?.[0]?.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTenants = tenants.filter((t) => {
+    const p = Array.isArray(t.pengguna) ? t.pengguna?.[0] : t.pengguna;
+    return t.nama?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const totalPages = Math.ceil(filteredTenants.length / itemsPerPage) || 1;
   const currentTenants = filteredTenants.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -130,7 +120,11 @@ export default function AdminUsersPage() {
                   </tr>
                 ) : (
                   currentTenants.map((toko) => {
-                    const owner = toko.pengguna?.[0] || { nama: 'Owner Toko', email: 'owner@tokiva.biz.id', aktif: true };
+                    // pengguna bisa object (FK 1:1) atau array
+                    const rawPengguna = toko.pengguna;
+                    const owner = Array.isArray(rawPengguna) 
+                      ? (rawPengguna[0] || { nama: 'Owner Toko', email: '—', aktif: true })
+                      : (rawPengguna || { nama: 'Owner Toko', email: '—', aktif: true });
                     const isAktif = owner.aktif !== false;
 
                     return (
