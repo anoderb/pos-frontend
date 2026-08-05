@@ -14,6 +14,8 @@ import useTfjsModel from './_hooks/useTfjsModel';
 import useWebcam from './_hooks/useWebcam';
 import ModelBanner from './_components/ModelBanner';
 import TestingSandbox from './_components/TestingSandbox';
+import TrainingPanel from './_components/TrainingPanel';
+import ModelDetailModal from './_components/ModelDetailModal';
 
 export default function AdminModelPage() {
   // --- Data State ---
@@ -48,7 +50,9 @@ export default function AdminModelPage() {
 
   // --- Confirm Modals ---
   const [deployModelTarget, setDeployModelTarget] = useState(null);
+  const [versiOverride, setVersiOverride] = useState('');
   const [deleteModelTarget, setDeleteModelTarget] = useState(null);
+  const [detailModel, setDetailModel] = useState(null);
 
   // --- Pagination ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -165,12 +169,15 @@ export default function AdminModelPage() {
   const handleDeployToPOS = async () => {
     if (!deployModelTarget) return;
     try {
-      await api.put(`/admin/model/${deployModelTarget.id}/aktifkan`, {}, { headers: { Authorization: `Bearer ${getToken()}` } });
+      const body = {};
+      if (versiOverride.trim()) body.versi_override = versiOverride.trim();
+      await api.put(`/admin/model/${deployModelTarget.id}/aktifkan`, body, { headers: { Authorization: `Bearer ${getToken()}` } });
       alert(`Model ${deployModelTarget.versi} BERHASIL DITERAPKAN KE SELURUH SISTEM POS! 🚀`);
     } catch (err) {
       alert(`Gagal deploy model: ${err.response?.data?.pesan || err.message}`);
     }
     setDeployModelTarget(null);
+    setVersiOverride('');
     fetchInitialData();
   };
 
@@ -271,6 +278,9 @@ export default function AdminModelPage() {
           onRegister={() => setIsRegisterModal(true)}
         />
 
+        {/* Training Pipeline (Kaggle) */}
+        <TrainingPanel onTrainingComplete={fetchInitialData} />
+
         {/* Testing Sandbox */}
         <TestingSandbox
           testingModel={testingModel} videoRef={webcam.videoRef}
@@ -311,7 +321,7 @@ export default function AdminModelPage() {
                   const isAktif = m.status === 'aktif';
                   const isTesting = testingModel?.id === m.id;
                   return (
-                    <tr key={m.id} className={`transition-colors ${isTesting ? 'bg-emerald-500/5' : 'hover:bg-slate-800/40'}`}>
+                    <tr key={m.id} onClick={() => setDetailModel(m)} className={`transition-colors cursor-pointer ${isTesting ? 'bg-emerald-500/5' : 'hover:bg-slate-800/40'}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-2xl border flex items-center justify-center shrink-0 ${isTesting ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}`}>
@@ -338,7 +348,7 @@ export default function AdminModelPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           <button onClick={() => handleSelectModelForTesting(m)}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 ${isTesting ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}>
                             <FlaskConical className="w-3.5 h-3.5" /> Uji
@@ -475,6 +485,9 @@ export default function AdminModelPage() {
         </div>
       )}
 
+      {/* Modal: Detail Model (klik row) */}
+      <ModelDetailModal model={detailModel} onClose={() => setDetailModel(null)} />
+
       {/* Modal: Deploy */}
       {deployModelTarget && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -483,6 +496,17 @@ export default function AdminModelPage() {
             <p className="text-xs text-slate-400">
               Terapkan <strong className="text-slate-200">{deployModelTarget.nama} ({deployModelTarget.versi})</strong> secara live ke seluruh kasir?
             </p>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Override Versi (opsional)</label>
+              <input
+                type="text"
+                value={versiOverride}
+                onChange={(e) => setVersiOverride(e.target.value)}
+                placeholder={`Auto: ${deployModelTarget.versi} — kosongkan untuk default`}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 text-xs font-mono focus:outline-none focus:border-emerald-500"
+              />
+              <p className="text-[10px] text-slate-500">Contoh: v2 (major bump), v1.2 (minor update). Format: v{major}.{minor}.{tanggal}</p>
+            </div>
             <div className="flex items-center gap-3 pt-2">
               <button onClick={() => setDeployModelTarget(null)} className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">Batal</button>
               <button onClick={handleDeployToPOS} className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20">Ya, Deploy</button>
