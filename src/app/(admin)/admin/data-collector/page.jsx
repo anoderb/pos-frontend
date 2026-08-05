@@ -7,7 +7,9 @@ import {
   FolderKanban, Search, Plus, Image as ImageIcon, Tag, X, CheckCircle2,
   ChevronLeft, ChevronRight, Maximize2, RefreshCw, Sliders, Database,
   CloudUpload, Link as LinkIcon, Check, Layers, AlertCircle, ShoppingBag,
+  MoreVertical, Pencil, Trash2, Power, ScanBarcode,
 } from 'lucide-react';
+import BarcodeScannerModal from '@/components/admin/BarcodeScannerModal';
 
 export default function AdminDataCollectorPage() {
   const [activeTab, setActiveTab] = useState('classes'); // 'classes' | 'unmapped'
@@ -53,6 +55,20 @@ export default function AdminDataCollectorPage() {
   const [addClassBarcode, setAddClassBarcode] = useState('');
   const [addClassDesc, setAddClassDesc] = useState('');
   const [previewPhoto, setPreviewPhoto] = useState(null);
+
+  // Class management state
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [isEditModal, setIsEditModal] = useState(false);
+  const [isDeleteModal, setIsDeleteModal] = useState(false);
+  const [editForm, setEditForm] = useState({ id: '', nama: '', barcode: '', deskripsi: '' });
+  const [selectedClassForAction, setSelectedClassForAction] = useState(null);
+
+  // Barcode scanner state
+  const [isFormScannerOpen, setIsFormScannerOpen] = useState(false);
+  const [isSearchScannerOpen, setIsSearchScannerOpen] = useState(false);
+
+  // Selective sync state
+  const [selectedClassIds, setSelectedClassIds] = useState([]);
 
   const getToken = () => localStorage.getItem('tokiva_admin_token') || localStorage.getItem('tokiva_jwt_token');
 
@@ -203,6 +219,81 @@ export default function AdminDataCollectorPage() {
     }
   };
 
+  // Class management handlers
+  const handleToggleAktif = async (cls) => {
+    setOpenMenuId(null);
+    try {
+      await api.put(`/admin/dataset/class/${cls.id}/toggle-aktif`, {}, { headers: { Authorization: `Bearer ${getToken()}` } });
+      fetchClasses();
+    } catch (err) {
+      alert('Gagal toggle status: ' + (err.response?.data?.pesan || err.message));
+    }
+  };
+
+  const handleOpenEdit = (cls) => {
+    setOpenMenuId(null);
+    setEditForm({ id: cls.id, nama: cls.nama || '', barcode: cls.barcode || '', deskripsi: cls.deskripsi || '' });
+    setSelectedClassForAction(cls);
+    setIsEditModal(true);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/admin/dataset/class/${editForm.id}`, {
+        nama: editForm.nama, barcode: editForm.barcode, deskripsi: editForm.deskripsi,
+      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      setIsEditModal(false);
+      fetchClasses();
+    } catch (err) {
+      alert('Gagal edit class: ' + (err.response?.data?.pesan || err.message));
+    }
+  };
+
+  const handleOpenDelete = (cls) => {
+    setOpenMenuId(null);
+    setSelectedClassForAction(cls);
+    setIsDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await api.delete(`/admin/dataset/class/${selectedClassForAction.id}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      setIsDeleteModal(false);
+      setSelectedClassForAction(null);
+      fetchClasses();
+    } catch (err) {
+      alert('Gagal hapus class: ' + (err.response?.data?.pesan || err.message));
+    }
+  };
+
+  // Selective sync handler
+  const handleSyncSelected = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await api.post('/admin/dataset/sync-huggingface', { class_ids: selectedClassIds }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      alert(res?.pesan || `Sync ${selectedClassIds.length} class berhasil!`);
+      setSelectedClassIds([]);
+      fetchSyncStatus();
+      fetchClasses();
+    } catch (err) {
+      alert('Sync gagal: ' + (err.response?.data?.pesan || err.message));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Barcode scanner callbacks
+  const handleFormBarcodeDetected = (code) => { setAddClassBarcode(code); };
+  const handleSearchBarcodeDetected = (code) => { setSearchTerm(code); };
+
+  // Close menu on outside click
+  useEffect(() => {
+    const closeMenu = () => setOpenMenuId(null);
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, []);
+
   // Filtered & Paginated Classes
   const filteredClasses = classes.filter((c) =>
     c.nama?.toLowerCase().includes(searchTerm.toLowerCase()) || c.barcode?.includes(searchTerm)
@@ -240,8 +331,12 @@ export default function AdminDataCollectorPage() {
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Cari class / barcode / toko..."
-                className="w-full pl-10 pr-4 py-2 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                placeholder="Cari class / barcode..."
+                className="w-full pl-10 pr-10 py-2 rounded-2xl bg-slate-900 border border-slate-800 text-xs font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50" />
+              <button type="button" onClick={() => setIsSearchScannerOpen(true)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-400 transition-colors" title="Scan Barcode">
+                <ScanBarcode className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             <button onClick={() => setIsAddClassModal(true)}
@@ -320,9 +415,51 @@ export default function AdminDataCollectorPage() {
                 currentClasses.map((cls) => {
                   const photoCount = cls.total_foto !== undefined ? cls.total_foto : 0;
                   const coverPhotoUrl = cls.thumbnail_url;
+                  const isAktif = cls.aktif !== false;
+                  const isSelected = selectedClassIds.includes(cls.id);
                   return (
-                    <div key={cls.id} onClick={() => handleOpenGallery(cls)}
-                      className="p-4 rounded-3xl bg-slate-900/90 border border-slate-800/80 hover:border-emerald-500/50 hover:bg-slate-900 transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between">
+                    <div key={cls.id}
+                      onClick={() => handleOpenGallery(cls)}
+                      className={`p-4 rounded-3xl bg-slate-900/90 border ${isSelected ? 'border-emerald-500/60 ring-1 ring-emerald-500/30' : 'border-slate-800/80'} hover:border-emerald-500/50 hover:bg-slate-900 transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between ${!isAktif ? 'opacity-50' : ''}`}>
+                      
+                      {/* Checkbox for selective sync */}
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (e.target.checked) setSelectedClassIds([...selectedClassIds, cls.id]);
+                          else setSelectedClassIds(selectedClassIds.filter(id => id !== cls.id));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute top-2 left-2 z-20 w-4 h-4 rounded accent-emerald-500 cursor-pointer"
+                      />
+
+                      {/* 3-dot menu */}
+                      <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === cls.id ? null : cls.id)}
+                          className="p-1 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors backdrop-blur-md">
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+                        {openMenuId === cls.id && (
+                          <div className="absolute right-0 mt-1 w-44 rounded-xl bg-slate-800 border border-slate-700 shadow-xl z-30 py-1">
+                            <button onClick={() => handleToggleAktif(cls)}
+                              className="w-full px-3 py-2 text-left text-[11px] font-semibold text-slate-200 hover:bg-slate-700 flex items-center gap-2 transition-colors">
+                              <Power className="w-3.5 h-3.5" /> {isAktif ? 'Nonaktifkan' : 'Aktifkan'}
+                            </button>
+                            <button onClick={() => handleOpenEdit(cls)}
+                              className="w-full px-3 py-2 text-left text-[11px] font-semibold text-slate-200 hover:bg-slate-700 flex items-center gap-2 transition-colors">
+                              <Pencil className="w-3.5 h-3.5" /> Edit Class
+                            </button>
+                            <button onClick={() => handleOpenDelete(cls)}
+                              className="w-full px-3 py-2 text-left text-[11px] font-semibold text-rose-400 hover:bg-slate-700 flex items-center gap-2 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" /> Hapus Class
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                       <div>
                         <div className="w-full h-32 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800/80 mb-3 relative">
                           {coverPhotoUrl ? (
@@ -333,9 +470,6 @@ export default function AdminDataCollectorPage() {
                               <span className="text-[9px] font-mono text-slate-600">HF DATASET</span>
                             </div>
                           )}
-                          <span className={`absolute top-2 right-2 px-2.5 py-1 rounded-xl text-[10px] font-bold backdrop-blur-md border ${photoCount > 0 ? 'bg-slate-950/80 text-emerald-400 border-emerald-500/30' : 'bg-slate-950/80 text-slate-400 border-slate-700/40'}`}>
-                            {photoCount} Foto
-                          </span>
                         </div>
                         <h3 className="font-bold text-xs text-slate-100 group-hover:text-emerald-400 transition-colors line-clamp-1">{cls.nama}</h3>
                         <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 font-mono">
@@ -343,8 +477,11 @@ export default function AdminDataCollectorPage() {
                         </p>
                       </div>
                       <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400">
-                        <span className="flex items-center gap-1 text-[10px] text-slate-500"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> HuggingFace</span>
-                        <span className="text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform">Galeri ({photoCount}) →</span>
+                        <span className={`flex items-center gap-1 ${isAktif ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isAktif ? <CheckCircle2 className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                          {isAktif ? 'Aktif' : 'Nonaktif'} · {photoCount} Foto
+                        </span>
+                        <span className="text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform">Galeri →</span>
                       </div>
                     </div>
                   );
@@ -633,9 +770,15 @@ export default function AdminDataCollectorPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Barcode (EAN-13)</label>
-                <input type="text" value={addClassBarcode} onChange={(e) => setAddClassBarcode(e.target.value)}
-                  placeholder="8998866200112"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none" />
+                <div className="flex gap-2">
+                  <input type="text" value={addClassBarcode} onChange={(e) => setAddClassBarcode(e.target.value)}
+                    placeholder="8998866200112"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none" />
+                  <button type="button" onClick={() => setIsFormScannerOpen(true)}
+                    className="px-3 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors shrink-0" title="Scan Barcode">
+                    <ScanBarcode className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Deskripsi / Brand</label>
@@ -652,6 +795,89 @@ export default function AdminDataCollectorPage() {
           </div>
         </div>
       )}
+      {/* Edit Class Modal */}
+      {isEditModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2"><Pencil className="w-4 h-4 text-emerald-400" /> Edit Master Class</h3>
+            <form onSubmit={handleSaveEdit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Nama Class Produk</label>
+                <input type="text" required value={editForm.nama} onChange={(e) => setEditForm({ ...editForm, nama: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Barcode</label>
+                <div className="flex gap-2">
+                  <input type="text" value={editForm.barcode} onChange={(e) => setEditForm({ ...editForm, barcode: e.target.value })}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none" />
+                  <button type="button" onClick={() => setIsFormScannerOpen(true)}
+                    className="px-3 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 shrink-0">
+                    <ScanBarcode className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Deskripsi / Brand</label>
+                <textarea rows={2} value={editForm.deskripsi} onChange={(e) => setEditForm({ ...editForm, deskripsi: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none" />
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button type="button" onClick={() => setIsEditModal(false)} className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Batal</button>
+                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {isDeleteModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100">Hapus Class "{selectedClassForAction?.nama}"?</h3>
+              <p className="text-xs text-slate-400 mt-1">Jika class memiliki foto dataset, hapus atau pindahkan foto terlebih dahulu.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setIsDeleteModal(false)} className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Batal</button>
+              <button onClick={handleConfirmDelete} className="flex-1 py-2.5 rounded-xl bg-rose-500 text-white font-bold text-xs">Ya, Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Scanner — Form Tambah Class */}
+      <BarcodeScannerModal
+        isOpen={isFormScannerOpen}
+        onClose={() => setIsFormScannerOpen(false)}
+        onDetected={handleFormBarcodeDetected}
+        title="Scan Barcode untuk Class"
+      />
+
+      {/* Barcode Scanner — Search */}
+      <BarcodeScannerModal
+        isOpen={isSearchScannerOpen}
+        onClose={() => setIsSearchScannerOpen(false)}
+        onDetected={handleSearchBarcodeDetected}
+        title="Scan Barcode untuk Cari"
+      />
+
+      {/* Floating Action Bar — Selective Sync */}
+      {selectedClassIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl flex items-center gap-4">
+          <span className="text-xs font-semibold text-slate-200">{selectedClassIds.length} Class Dipilih</span>
+          <button onClick={handleSyncSelected} disabled={isSyncing}
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5">
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} /> Sync Selected ke HF
+          </button>
+          <button onClick={() => setSelectedClassIds([])} className="text-slate-400 hover:text-slate-200 text-xs font-semibold">Batal</button>
+        </div>
+      )}
+
     </AdminLayout>
   );
 }
