@@ -47,7 +47,6 @@ export default function AdminSidebar() {
       items: [
         { label: 'Data Collector & Class', href: '/admin/data-collector', icon: FolderKanban },
         { label: 'Kurasi Koreksi Kasir', href: '/admin/kurasi', icon: CheckSquare },
-        { label: 'HuggingFace Sync', href: '/admin/training', icon: RefreshCw },
         { label: 'AI Model Deployment', href: '/admin/model', icon: Cpu },
       ],
     },

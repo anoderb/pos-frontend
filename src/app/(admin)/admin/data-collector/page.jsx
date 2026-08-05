@@ -7,7 +7,7 @@ import {
   FolderKanban, Search, Plus, Image as ImageIcon, Tag, X, CheckCircle2,
   ChevronLeft, ChevronRight, Maximize2, RefreshCw, Sliders, Database,
   CloudUpload, Link as LinkIcon, Check, Layers, AlertCircle, ShoppingBag,
-  MoreVertical, Pencil, Trash2, Power, ScanBarcode,
+  MoreVertical, Pencil, Trash2, Power, ScanBarcode, ExternalLink,
 } from 'lucide-react';
 import BarcodeScannerModal from '@/components/admin/BarcodeScannerModal';
 
@@ -376,6 +376,10 @@ export default function AdminDataCollectorPage() {
               className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700" title="Pengaturan Auto-Sync">
               <Sliders className="w-4 h-4" />
             </button>
+            <a href="https://huggingface.co/datasets/Anoderb/dataset-collect" target="_blank" rel="noopener noreferrer"
+              className="px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all border border-slate-700 flex items-center gap-2" title="Buka Repository HuggingFace">
+              <ExternalLink className="w-4 h-4" /> HF Repo
+            </a>
           </div>
         </div>
 
