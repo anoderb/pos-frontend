@@ -16,6 +16,7 @@ import {
   ChevronRight,
   X,
   CheckCircle,
+  XCircle,
   Printer,
   Share2,
   Banknote,
@@ -84,6 +85,9 @@ export default function KasirPosPage() {
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedProduk, setDetectedProduk] = useState(null);
   const [scannedBarcodeCode, setScannedBarcodeCode] = useState('');
+  const [barcodeDetectorSupported, setBarcodeDetectorSupported] = useState(null); // null=cek, true/false
+  const [barcodeNotFound, setBarcodeNotFound] = useState(false);
+  const [manualBarcode, setManualBarcode] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
 
   // Video Ref for HTML5 Camera
@@ -288,21 +292,24 @@ export default function KasirPosPage() {
         });
       }
 
-      // Barcode / OCR Detector Loop
-      if (showBarcodeScan) {
+      // Deteksi support BarcodeDetector sekali (Chrome desktop/Firefox: unsupported)
+      if (typeof window !== 'undefined') {
+        setBarcodeDetectorSupported('BarcodeDetector' in window);
+      }
+
+      // Barcode / OCR Detector Loop (hanya jalan kalau didukung)
+      if (showBarcodeScan && typeof window !== 'undefined' && 'BarcodeDetector' in window) {
         barcodeTimer = setInterval(() => {
-          if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
-            const detector = new window.BarcodeDetector({
-              formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
-            });
-            if (videoRef.current && videoRef.current.readyState === 4) {
-              detector.detect(videoRef.current).then(results => {
-                if (results.length > 0) {
-                  const code = results[0].rawValue;
-                  handleDetectedBarcode(code);
-                }
-              }).catch(() => {});
-            }
+          const detector = new window.BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code']
+          });
+          if (videoRef.current && videoRef.current.readyState === 4) {
+            detector.detect(videoRef.current).then(results => {
+              if (results.length > 0) {
+                const code = results[0].rawValue;
+                handleDetectedBarcode(code);
+              }
+            }).catch(() => {});
           }
         }, 400);
       }
@@ -318,15 +325,28 @@ export default function KasirPosPage() {
   }, [showAiScan, showBarcodeScan]);
 
   const handleDetectedBarcode = (code) => {
+    if (!code) return;
     setScannedBarcodeCode(code);
+    setBarcodeNotFound(false);
     const found = produkList.find(p => p.barcode === code || p.id === code);
     if (found) {
       addToCart(found);
       setTimeout(() => {
         setShowBarcodeScan(false);
         setScannedBarcodeCode('');
+        setManualBarcode('');
       }, 700);
+    } else {
+      setBarcodeNotFound(true);
+      setManualBarcode(code);
     }
+  };
+
+  const handleManualBarcodeSubmit = async (e) => {
+    e?.preventDefault?.();
+    const code = (manualBarcode || '').trim();
+    if (!code) return;
+    handleDetectedBarcode(code);
   };
 
   // 🔊 Helper for POS Scanner Beep Sound (Web Audio API)
@@ -1224,18 +1244,48 @@ export default function KasirPosPage() {
             )}
 
             {/* Scanned Barcode Result Pill */}
-            {showBarcodeScan && scannedBarcodeCode && (
+            {showBarcodeScan && scannedBarcodeCode && !barcodeNotFound && (
               <div className="mt-3 px-4 py-2 bg-black/75 backdrop-blur border border-emerald-500/30 rounded-2xl text-white text-xs font-semibold flex items-center gap-2 shadow-lg animate-fade-in">
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Barcode: <span className="font-mono text-emerald-400 font-bold">{scannedBarcodeCode}</span></span>
               </div>
             )}
 
+            {/* Barcode Not Found Feedback */}
+            {showBarcodeScan && barcodeNotFound && (
+              <div className="mt-3 px-4 py-2 bg-black/75 backdrop-blur border border-rose-500/40 rounded-2xl text-white text-xs font-semibold flex items-center gap-2 shadow-lg animate-fade-in">
+                <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>Produk tidak ditemukan untuk kode <span className="font-mono text-rose-400 font-bold">{scannedBarcodeCode}</span></span>
+              </div>
+            )}
+
+            {/* Manual Barcode Input Fallback (browser tanpa BarcodeDetector / produk tak ketemu) */}
+            {showBarcodeScan && (
+              <form
+                onSubmit={handleManualBarcodeSubmit}
+                className="mt-3 flex items-center gap-2 max-w-xs mx-auto"
+              >
+                <input
+                  value={manualBarcode}
+                  onChange={(e) => { setManualBarcode(e.target.value); setBarcodeNotFound(false); }}
+                  placeholder="Ketik kode barcode…"
+                  inputMode="numeric"
+                  className="flex-1 min-w-0 px-3 py-2 bg-black/60 border border-white/15 rounded-xl text-white text-xs font-mono placeholder-gray-500 focus:outline-none focus:border-emerald-400/60"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-400/30 transition-colors"
+                >
+                  Tambah
+                </button>
+              </form>
+            )}
+
             {/* Demo Barcode Simulation Buttons (Barcode Mode Only) */}
             {showBarcodeScan && (
               <div className="mt-3 flex items-center justify-center gap-1.5 flex-wrap max-w-xs">
                 <span className="text-[10px] text-gray-400 font-medium">Test Barcode:</span>
-                {produkList.slice(0, 2).map((p, idx) => (
+                {produkList.filter(p => p.barcode).slice(0, 2).map((p, idx) => (
                   <button
                     key={p.id || `test-code-${idx}`}
                     onClick={() => handleDetectedBarcode(p.barcode)}
