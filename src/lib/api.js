@@ -1,6 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000/api';
+// Dynamic API URL: production uses api.tokiva.biz.id, dev uses localhost
+function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.includes('tokiva.biz.id') || host.includes('vercel.app')) {
+      return 'https://api.tokiva.biz.id/api';
+    }
+  }
+  return 'http://127.0.0.1:5000/api';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
