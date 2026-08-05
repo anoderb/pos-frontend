@@ -44,29 +44,29 @@ export default function AdminDashboardPage() {
   const statCards = [
     {
       title: 'Total Tenant Toko',
-      value: metrics?.totalToko || 0,
-      subtext: `${metrics?.totalUser || 0} Total Pengguna`,
+      value: metrics?.toko?.total ?? 0,
+      subtext: `${metrics?.toko?.total_pengguna ?? 0} Total Pengguna`,
       icon: Store,
       color: 'from-blue-500 to-indigo-600',
     },
     {
       title: 'Class Produk AI',
-      value: metrics?.totalClass || 26,
+      value: metrics?.ai?.total_class ?? 0,
       subtext: 'Master Label Dataset AI',
       icon: FolderKanban,
       color: 'from-emerald-500 to-teal-600',
     },
     {
       title: 'Foto Dataset AI',
-      value: (metrics?.totalFotoDataset || 0).toLocaleString('id-ID'),
-      subtext: 'HuggingFace Hub',
+      value: (metrics?.ai?.total_foto_dataset ?? 0).toLocaleString('id-ID'),
+      subtext: `${metrics?.ai?.total_koreksi_pending ?? 0} Koreksi Pending`,
       icon: Database,
       color: 'from-purple-500 to-pink-600',
     },
     {
       title: 'Versi Model AI Aktif',
-      value: metrics?.modelAktif?.versi || 'v1.0',
-      subtext: `Akurasi: ${((metrics?.modelAktif?.akurasi || 0.958) * 100).toFixed(1)}%`,
+      value: metrics?.ai?.model_aktif?.versi || '—',
+      subtext: `Akurasi: ${((metrics?.ai?.model_aktif?.akurasi || 0) * 100).toFixed(1)}%`,
       icon: Cpu,
       color: 'from-amber-500 to-orange-600',
     },
@@ -87,7 +87,7 @@ export default function AdminDashboardPage() {
               Selamat Datang di Tokiva Master Hub 🚀
             </h2>
             <p className="text-xs text-slate-400 max-w-xl">
-              Pusat kendali ekosistem SaaS Tokiva POS, pemantauan 4.800+ foto AI visual recognition, dan live deployment model AI.
+              Pusat kendali ekosistem SaaS Tokiva POS, pemantauan {(metrics?.ai?.total_foto_dataset ?? 0).toLocaleString('id-ID')} foto AI visual recognition, dan live deployment model AI.
             </p>
           </div>
 
@@ -145,18 +145,18 @@ export default function AdminDashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
               <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                 <span className="text-[11px] font-semibold text-slate-400 block">Class Produk AI</span>
-                <span className="text-xl font-bold text-slate-100 mt-1 block">26 Class</span>
+                <span className="text-xl font-bold text-slate-100 mt-1 block">{metrics?.ai?.total_class ?? 0} Class</span>
                 <span className="text-[10px] text-slate-500 mt-1 block">Master Label Dataset</span>
               </div>
               <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                 <span className="text-[11px] font-semibold text-slate-400 block">Dataset Foto</span>
-                <span className="text-xl font-bold text-emerald-400 mt-1 block">4.800 Foto</span>
+                <span className="text-xl font-bold text-emerald-400 mt-1 block">{(metrics?.ai?.total_foto_dataset ?? 0).toLocaleString('id-ID')} Foto</span>
                 <span className="text-[10px] text-slate-500 mt-1 block">Hosted di HuggingFace Hub</span>
               </div>
               <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                 <span className="text-[11px] font-semibold text-slate-400 block">Akurasi Model</span>
-                <span className="text-xl font-bold text-indigo-400 mt-1 block">95.8%</span>
-                <span className="text-[10px] text-slate-500 mt-1 block">MobileNetV3 Backbone</span>
+                <span className="text-xl font-bold text-indigo-400 mt-1 block">{((metrics?.ai?.model_aktif?.akurasi || 0) * 100).toFixed(1)}%</span>
+                <span className="text-[10px] text-slate-500 mt-1 block">{metrics?.ai?.model_aktif?.nama || '—'}</span>
               </div>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function AdminDashboardPage() {
             >
               <div className="flex items-center gap-2.5">
                 <FolderKanban className="w-4 h-4 text-emerald-400" />
-                <span>Galeri 4.800 Foto AI</span>
+                <span>Galeri {(metrics?.ai?.total_foto_dataset ?? 0).toLocaleString('id-ID')} Foto AI</span>
               </div>
               <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
             </a>
