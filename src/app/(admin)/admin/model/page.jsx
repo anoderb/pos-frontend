@@ -156,8 +156,8 @@ export default function AdminModelPage() {
     try {
       await api.put(`/admin/model/${activeModel.id}/threshold`, { confidence_threshold: threshold }, { headers: { Authorization: `Bearer ${getToken()}` } });
       alert(`Confidence threshold berhasil diperbarui ke ${(threshold * 100).toFixed(0)}%!`);
-    } catch {
-      alert(`Threshold tersimpan di sandbox: ${(threshold * 100).toFixed(0)}%`);
+    } catch (err) {
+      alert(`Gagal menyimpan threshold: ${err.response?.data?.pesan || err.message}`);
     }
   };
 
@@ -167,8 +167,8 @@ export default function AdminModelPage() {
     try {
       await api.put(`/admin/model/${deployModelTarget.id}/aktifkan`, {}, { headers: { Authorization: `Bearer ${getToken()}` } });
       alert(`Model ${deployModelTarget.versi} BERHASIL DITERAPKAN KE SELURUH SISTEM POS! 🚀`);
-    } catch {
-      alert(`Model ${deployModelTarget.versi} diaktifkan sebagai live model di sistem POS!`);
+    } catch (err) {
+      alert(`Gagal deploy model: ${err.response?.data?.pesan || err.message}`);
     }
     setDeployModelTarget(null);
     fetchInitialData();
@@ -217,11 +217,11 @@ export default function AdminModelPage() {
         alert(`Model ${versi} berhasil terdaftar di database!`);
       }
       setIsRegisterModal(false);
-      setVersi(''); setNamaModel(''); setDeskripsi('');
-      fetchInitialData();
-    } catch {
       setIsRegisterModal(false);
       fetchInitialData();
+    } catch (err) {
+      alert(`Gagal mendaftarkan model: ${err.response?.data?.pesan || err.message}`);
+      setIsRegisterModal(false);
     }
   };
 
